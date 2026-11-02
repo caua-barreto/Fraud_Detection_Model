@@ -5,7 +5,9 @@
 Este projeto tem como objetivo desenvolver um sistema completo de ponta a ponta para a detecção de fraudes em transações de crédito, utilizando a base de dados da competição **IEEE-CIS Fraud Detection** do Kaggle. 
 
 O foco deste projeto vai muito além de "treinar um modelo". O objetivo é construir uma solução **robusta, otimizada e altamente interpretável**, onde as métricas estatísticas estejam diretamente alinhadas ao valor de negócio, minimizando falsos positivos (bloqueios indevidos de clientes) e maximizando a interceptação de fraudadores reais.
+---
 
+## ATUALIZAÇÃO 02/11/2026 --> O projeto encontra-se no final da fase de EDA, estou analisando métricas estatísticas como: Correlação, VIF, IV para buscar reduzir as features que serão inclusas na master-table
 ---
 
 ## 📊 O Dataset
