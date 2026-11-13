@@ -1,37 +1,54 @@
+import os
+import sys
 import math
+import json
+import warnings
+from pathlib import Path
+from typing import Union, Optional, Dict, List, Tuple, Any, Iterable
+
+import numpy as np
+import pandas as pd
+import scipy.stats as stats
+from scipy.stats import ks_2samp
+import matplotlib.pyplot as plt
+from matplotlib import ticker
+import seaborn as sns
+
+try:
+    from IPython.display import display
+except ImportError:
+    display = print
+
+# Scikit-Learn
 from sklearn.metrics import (
     accuracy_score, precision_score, recall_score,
     f1_score, roc_auc_score, average_precision_score,
-    confusion_matrix, classification_report
+    confusion_matrix, classification_report, ConfusionMatrixDisplay,
+    mean_absolute_error, mean_squared_error, r2_score
 )
-from sklearn.metrics import confusion_matrix
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-import os
-import scipy.stats as stats
-import seaborn as sns
-from IPython.display import display
-from matplotlib import ticker
-from sklearn.metrics import (
-    mean_absolute_error,
-    mean_absolute_percentage_error,
-    mean_squared_error,
-    r2_score,
+from sklearn.model_selection import (
+    KFold, StratifiedKFold, cross_val_score, cross_val_predict, train_test_split
 )
-from sklearn.model_selection import KFold, cross_val_score, train_test_split
-from sklearn.preprocessing import MinMaxScaler
-from typing import Union, Optional, Dict, List, Tuple
-import numpy as np
-import scipy.stats as stats
-from sklearn.model_selection import StratifiedKFold
-from sklearn.metrics import (accuracy_score, precision_score, recall_score, 
-                             f1_score, roc_auc_score, average_precision_score)
-from scipy.stats import ks_2samp
-from sklearn.metrics import ConfusionMatrixDisplay
-from sklearn.model_selection import cross_val_predict, StratifiedKFold
-from statsmodels.stats.outliers_influence import variance_inflation_factor
-from statsmodels.tools.tools import add_constant
+from sklearn.preprocessing import MinMaxScaler, StandardScaler, RobustScaler
+
+# Modelos e explicabilidade (com fallback gracioso)
+try:
+    import joblib
+except ImportError:
+    joblib = None
+
+try:
+    import shap
+except ImportError:
+    shap = None
+
+try:
+    from statsmodels.stats.outliers_influence import variance_inflation_factor
+    from statsmodels.tools.tools import add_constant
+except ImportError:
+    variance_inflation_factor = None
+    add_constant = None
+
 def histograma_simples(
     df: pd.DataFrame, 
     coluna: str = 'price', 
@@ -1095,48 +1112,37 @@ def plot_feature_importance(
     """
     Plota a importância das features de um modelo treinado (coeficientes
     para modelos lineares ou feature_importances_ para árvores).
-
-    Parâmetros:
-    ----------
-    modelo : estimator
-        Modelo sklearn já treinado.
-    feature_names : list
-        Lista com os nomes das features.
-    top_n : int, default=20
-        Número de features mais importantes a exibir.
-    titulo : str, optional
-        Título do gráfico.
-    figsize : tuple, default=(14, 10)
-        Dimensões da figura.
-    cor : str, default='steelblue'
-        Cor das barras.
-    xlabel : str, optional
-        Rótulo do eixo X. Se None, usa o tipo detectado.
-    annot : bool, default=True
-        Se True, exibe o valor numérico ao lado de cada barra.
-    fmt : str, default='.3f'
-        Formatação dos valores anotados.
-    alpha : float, default=0.85
-        Transparência das barras.
+    Retorna o DataFrame ordenado com o Top N features.
     """
     clf = modelo
-    if hasattr(modelo, 'named_steps') and 'clf' in modelo.named_steps:
-        clf = modelo.named_steps['clf']
+    if hasattr(modelo, 'named_steps'):
+        if 'clf' in modelo.named_steps:
+            clf = modelo.named_steps['clf']
+        elif 'model' in modelo.named_steps:
+            clf = modelo.named_steps['model']
+        elif 'classifier' in modelo.named_steps:
+            clf = modelo.named_steps['classifier']
+        else:
+            clf = modelo[-1]
 
     if hasattr(clf, 'feature_importances_'):
-        importancias = clf.feature_importances_
+        importancias = np.asarray(clf.feature_importances_)
         tipo = 'Feature Importance'
     elif hasattr(clf, 'coef_'):
         coefs = clf.coef_
         if coefs.ndim > 1:
             coefs = coefs[0]
-        importancias = np.abs(coefs)
+        importancias = np.abs(np.asarray(coefs))
         tipo = '|Coeficientes|'
     else:
         raise ValueError("O modelo não possui 'feature_importances_' nem 'coef_'.")
 
+    feature_names_list = list(feature_names)
+    if len(feature_names_list) != len(importancias):
+        feature_names_list = [f"feature_{i}" for i in range(len(importancias))]
+
     df_imp = pd.DataFrame({
-        'Feature': feature_names,
+        'Feature': feature_names_list,
         'Importância': importancias
     }).sort_values('Importância', ascending=True).tail(top_n)
 
@@ -1147,9 +1153,11 @@ def plot_feature_importance(
     )
 
     if annot:
+        max_val = df_imp['Importância'].max()
+        offset = max_val * 0.02 if max_val > 0 else 0.01
         for bar, val in zip(bars, df_imp['Importância']):
             ax.text(
-                bar.get_width() + df_imp['Importância'].max() * 0.02,
+                bar.get_width() + offset,
                 bar.get_y() + bar.get_height() / 2,
                 f'{val:{fmt}}',
                 va='center', fontsize=9, fontweight='bold',
@@ -1164,6 +1172,7 @@ def plot_feature_importance(
     plt.tight_layout()
     plt.show()
 
+    return df_imp.sort_values('Importância', ascending=False).reset_index(drop=True).head(top_n)
 
 def comparar_modelos(
     modelos: dict,
@@ -2096,118 +2105,199 @@ def teste_significancia_chi2(
         .reset_index(drop=True)
     )
 
-def avaliar_classificador(modelo, X, y, nome_modelo, cv=5, threshold=0.5, tipo_metricas='todas'):
+def avaliar_classificador(modelo, X_train, y_train, X_test, y_test, nome_modelo: str, cv: int = 3, thresholds_dict: dict = None, groups=None):
     """
-    Aplica Stratified K-Fold CV preservando colunas do Pandas.
-    Aceita um threshold float ou um dicionário {nome_modelo: threshold}.
+    Avalia um modelo de classificação binária via validação cruzada no Treino
+    (GroupKFold se `groups` fornecido, senão StratifiedKFold) e teste cego em `X_test`.
+    Exibe a média real dos folds de treino do CV (`Treino CV`), média dos folds de validação
+    (`Val CV` + IC 95%), desempenho em `X_test` (`Teste`) e o gap (`Teste - Treino CV`).
     """
-    if tipo_metricas not in ['todas', 'dependentes', 'independentes']:
-        raise ValueError("O parâmetro tipo_metricas deve ser: 'todas', 'dependentes' ou 'independentes'.")
-        
-    # --- NOVIDADE: Resolve o Threshold (Dicionário ou Float) ---
-    if isinstance(threshold, dict):
-        t_atual = threshold.get(nome_modelo, 0.50) # Puxa do dict ou usa 0.5 padrão
+    from sklearn.metrics import (
+        roc_auc_score, average_precision_score, accuracy_score,
+        precision_score, recall_score
+    )
+    from scipy.stats import ks_2samp
+    from sklearn.model_selection import StratifiedKFold, GroupKFold
+
+    threshold = 0.5
+    if thresholds_dict is not None and nome_modelo in thresholds_dict:
+        threshold = float(thresholds_dict[nome_modelo])
+
+    y_tr_arr = np.asarray(y_train)
+    y_te_arr = np.asarray(y_test)
+
+    if groups is not None:
+        cv_splitter = GroupKFold(n_splits=cv) if isinstance(cv, int) else cv
+        splits = cv_splitter.split(X_train, y_tr_arr, groups=groups)
+        cv_desc = f"GroupKFold CV = {getattr(cv_splitter, 'n_splits', cv)}"
     else:
-        t_atual = float(threshold)
-        
-    skf = StratifiedKFold(n_splits=cv, shuffle=True, random_state=42)
-    
-    accs_val, precs_val, recs_val, f1s_val, roc_val, pr_val, ks_val = [], [], [], [], [], [], []
-    accs_train, precs_train, recs_train, f1s_train, roc_train, pr_train, ks_train = [], [], [], [], [], [], []
-    
-    for train_index, val_index in skf.split(X, y):
-        
-        if isinstance(X, pd.DataFrame):
-            X_fold_train, X_fold_val = X.iloc[train_index], X.iloc[val_index]
+        cv_splitter = StratifiedKFold(n_splits=cv, shuffle=True, random_state=42) if isinstance(cv, int) else cv
+        splits = cv_splitter.split(X_train, y_tr_arr)
+        cv_desc = f"CV = {getattr(cv_splitter, 'n_splits', cv)}"
+
+    print(f"{'='*108}")
+    print(f" {nome_modelo.upper()} ({cv_desc} | Threshold = {threshold:.4f})")
+    print(f"{'-'*108}")
+
+    prop_tr = float(np.mean(y_tr_arr)) * 100
+    prop_te = float(np.mean(y_te_arr)) * 100
+    print(f" Taxa Base de Fraude (Target=1): Treino = {prop_tr:.2f}% | Teste = {prop_te:.2f}%")
+    print(f"{'-'*108}")
+
+    cv_tr_roc, cv_tr_gini, cv_tr_pr, cv_tr_ks = [], [], [], []
+    cv_tr_acc, cv_tr_prec, cv_tr_rec = [], [], []
+    cv_va_roc, cv_va_gini, cv_va_pr, cv_va_ks = [], [], [], []
+    cv_va_acc, cv_va_prec, cv_va_rec = [], [], []
+
+    for train_idx, val_idx in splits:
+        if hasattr(X_train, 'iloc'):
+            X_f_tr, X_f_va = X_train.iloc[train_idx], X_train.iloc[val_idx]
         else:
-            X_fold_train, X_fold_val = X[train_index], X[val_index]
-            
-        if isinstance(y, pd.Series):
-            y_fold_train, y_fold_val = y.iloc[train_index], y.iloc[val_index]
-        else:
-            y_fold_train, y_fold_val = y[train_index], y[val_index]
-        
-        modelo.fit(X_fold_train, y_fold_train)
-        
-        prob_fold_val = modelo.predict_proba(X_fold_val)[:, 1]
-        prob_fold_train = modelo.predict_proba(X_fold_train)[:, 1]
-        
-        # Usa o t_atual definido no topo da função
-        pred_fold_val = (prob_fold_val >= t_atual).astype(int)
-        pred_fold_train = (prob_fold_train >= t_atual).astype(int)
-        
-        # Dependentes
-        accs_val.append(accuracy_score(y_fold_val, pred_fold_val))
-        precs_val.append(precision_score(y_fold_val, pred_fold_val, zero_division=0))
-        recs_val.append(recall_score(y_fold_val, pred_fold_val))
-        f1s_val.append(f1_score(y_fold_val, pred_fold_val))
-        
-        accs_train.append(accuracy_score(y_fold_train, pred_fold_train))
-        precs_train.append(precision_score(y_fold_train, pred_fold_train, zero_division=0))
-        recs_train.append(recall_score(y_fold_train, pred_fold_train))
-        f1s_train.append(f1_score(y_fold_train, pred_fold_train))
-        
-        # Independentes
-        roc_val.append(roc_auc_score(y_fold_val, prob_fold_val))
-        pr_val.append(average_precision_score(y_fold_val, prob_fold_val))
-        ks_stat_val, _ = ks_2samp(prob_fold_val[y_fold_val == 1], prob_fold_val[y_fold_val == 0])
-        ks_val.append(ks_stat_val)
-        
-        roc_train.append(roc_auc_score(y_fold_train, prob_fold_train))
-        pr_train.append(average_precision_score(y_fold_train, prob_fold_train))
-        ks_stat_train, _ = ks_2samp(prob_fold_train[y_fold_train == 1], prob_fold_train[y_fold_train == 0])
-        ks_train.append(ks_stat_train)
-        
-    def calcular_ic(metricas):
-        media = np.mean(metricas)
-        variancia_amostral = np.var(metricas, ddof=1)
-        prop_teste = 1 / cv
-        prop_treino = 1 - prop_teste
-        correcao = (1 / cv) + (prop_teste / prop_treino)
-        erro_padrao_corrigido = np.sqrt(variancia_amostral * correcao)
-        ic_inf, ic_sup = stats.t.interval(confidence=0.95, df=cv-1, loc=media, scale=erro_padrao_corrigido)
-        return media, max(0.0, ic_inf), min(1.0, ic_sup)
+            X_f_tr, X_f_va = X_train[train_idx], X_train[val_idx]
 
-    metricas_dependentes = {
-        'Accuracy': (accs_train, accs_val),
-        'Precision': (precs_train, precs_val),
-        'Recall': (recs_train, recs_val),
-        'F1-Score': (f1s_train, f1s_val)
-    }
-    
-    metricas_independentes = {
-        'ROC-AUC': (roc_train, roc_val),
-        'PR-AUC': (pr_train, pr_val),
-        'KS': (ks_train, ks_val)
-    }
+        y_f_tr, y_f_va = y_tr_arr[train_idx], y_tr_arr[val_idx]
 
-    metricas_dict = {}
-    if tipo_metricas in ['todas', 'dependentes']:
-        metricas_dict.update(metricas_dependentes)
-    if tipo_metricas in ['todas', 'independentes']:
-        metricas_dict.update(metricas_independentes)
+        modelo.fit(X_f_tr, y_f_tr)
 
-    # Exibe o limiar efetivamente utilizado no cabeçalho
-    info_thresh = f" | Threshold = {t_atual:.4f}" if tipo_metricas != 'independentes' else ""
-    
-    print(f"\n{'=' * 92}")
-    print(f" {nome_modelo.upper()} (CV = {cv}{info_thresh})")
-    print(f"{'-' * 92}")
-    print(f"  {'Métrica':<10} | {'Treino':<10} | {'Validação':<10} | {'Gap (V-T)':<10} | {'IC 95% (Validação)':<23} | {'Margem (±)':<10}")
-    print(f"  {'-'*10} | {'-'*10} | {'-'*10} | {'-'*10} | {'-'*23} | {'-'*10}")
+        # Métricas nos folds de treino do CV (Treino CV)
+        probs_f_tr = modelo.predict_proba(X_f_tr)[:, 1]
+        preds_f_tr = (probs_f_tr >= threshold).astype(int)
+        roc_ftr = roc_auc_score(y_f_tr, probs_f_tr)
+        cv_tr_roc.append(roc_ftr)
+        cv_tr_gini.append(2 * roc_ftr - 1)
+        cv_tr_pr.append(average_precision_score(y_f_tr, probs_f_tr))
+        pos_ftr, neg_ftr = probs_f_tr[y_f_tr == 1], probs_f_tr[y_f_tr == 0]
+        cv_tr_ks.append(ks_2samp(pos_ftr, neg_ftr).statistic if (len(pos_ftr) > 0 and len(neg_ftr) > 0) else 0.0)
+        cv_tr_acc.append(accuracy_score(y_f_tr, preds_f_tr))
+        cv_tr_prec.append(precision_score(y_f_tr, preds_f_tr, zero_division=0))
+        cv_tr_rec.append(recall_score(y_f_tr, preds_f_tr, zero_division=0))
 
-    for nome_metrica, (lista_treino, lista_val) in metricas_dict.items():
-        media_treino = np.mean(lista_treino)
-        media_val, ic_inf, ic_sup = calcular_ic(lista_val)
-        gap = media_val - media_treino
-        margem_erro = abs(media_val - ic_inf)
-        fmt_gap = f"{gap:>+10.4f}"
-        print(f"  {nome_metrica:<10} |  {media_treino:>9.4f} |  {media_val:>9.4f} | {fmt_gap} | [ {ic_inf:>8.4f},  {ic_sup:>8.4f}] |  ±{margem_erro:>7.4f}")
+        # Métricas nos folds de validação do CV (Val CV)
+        probs_f_va = modelo.predict_proba(X_f_va)[:, 1]
+        preds_f_va = (probs_f_va >= threshold).astype(int)
+        roc_fva = roc_auc_score(y_f_va, probs_f_va)
+        cv_va_roc.append(roc_fva)
+        cv_va_gini.append(2 * roc_fva - 1)
+        cv_va_pr.append(average_precision_score(y_f_va, probs_f_va))
+        pos_fva, neg_fva = probs_f_va[y_f_va == 1], probs_f_va[y_f_va == 0]
+        cv_va_ks.append(ks_2samp(pos_fva, neg_fva).statistic if (len(pos_fva) > 0 and len(neg_fva) > 0) else 0.0)
+        cv_va_acc.append(accuracy_score(y_f_va, preds_f_va))
+        cv_va_prec.append(precision_score(y_f_va, preds_f_va, zero_division=0))
+        cv_va_rec.append(recall_score(y_f_va, preds_f_va, zero_division=0))
 
-    print(f"{'=' * 92}\n")
-    
-    modelo.fit(X, y)
+    ic_roc = f"[{np.mean(cv_va_roc) - 2*np.std(cv_va_roc):.4f}, {np.mean(cv_va_roc) + 2*np.std(cv_va_roc):.4f}]"
+    ic_gini = f"[{np.mean(cv_va_gini) - 2*np.std(cv_va_gini):.4f}, {np.mean(cv_va_gini) + 2*np.std(cv_va_gini):.4f}]"
+
+    # Treino final em 100% de X_train e avaliação no X_test de validação (antes do OOT)
+    modelo.fit(X_train, y_tr_arr)
+    prob_test = modelo.predict_proba(X_test)[:, 1]
+    pred_test = (prob_test >= threshold).astype(int)
+
+    roc_te = roc_auc_score(y_te_arr, prob_test)
+    gini_te = 2 * roc_te - 1
+    pr_te = average_precision_score(y_te_arr, prob_test)
+    pos_te, neg_te = prob_test[y_te_arr == 1], prob_test[y_te_arr == 0]
+    ks_te = ks_2samp(pos_te, neg_te).statistic if (len(pos_te) > 0 and len(neg_te) > 0) else 0.0
+
+    acc_te = accuracy_score(y_te_arr, pred_test)
+    prec_te = precision_score(y_te_arr, pred_test, zero_division=0)
+    rec_te = recall_score(y_te_arr, pred_test, zero_division=0)
+
+    def format_row(name, tr_cv, va_cv, val_20, ic="-"):
+        gap = val_20 - tr_cv
+        gap_str = f"{'+' if gap > 0 else ''}{gap:.4f}"
+        return f" {name:<10} | {tr_cv:.4f}     | {va_cv:.4f}     | {val_20:.4f}     | {gap_str:<11} | {ic}"
+
+    header = f" {'Metrica':<10} | {'Treino':<10} | {'Teste':<10} | {'Validacao':<10} | {'Gap(Va-Tr)':<11} | {'IC 95% (Teste CV)'}"
+
+    print("\n [ METRICAS INDEPENDENTES DO THRESHOLD (Probabilidades) ]")
+    print(header)
+    print("-" * len(header))
+    print(format_row("ROC-AUC", np.mean(cv_tr_roc), np.mean(cv_va_roc), roc_te, ic_roc))
+    print(format_row("GINI", np.mean(cv_tr_gini), np.mean(cv_va_gini), gini_te, ic_gini))
+    print(format_row("PR-AUC", np.mean(cv_tr_pr), np.mean(cv_va_pr), pr_te))
+    print(format_row("KS", np.mean(cv_tr_ks), np.mean(cv_va_ks), ks_te))
+
+    print(f"\n [ METRICAS DEPENDENTES DO THRESHOLD (Corte = {threshold:.4f}) ]")
+    print(header)
+    print("-" * len(header))
+    print(format_row("Accuracy", np.mean(cv_tr_acc), np.mean(cv_va_acc), acc_te))
+    print(format_row("Precision", np.mean(cv_tr_prec), np.mean(cv_va_prec), prec_te))
+    print(format_row("Recall", np.mean(cv_tr_rec), np.mean(cv_va_rec), rec_te))
+    print(f"{'='*108}\n")
+
     return modelo
+
+
+def avaliar_classificacao_oot(modelo, X_oot, y_oot, X_hist, y_hist, threshold=0.5, nome_modelo="Modelo Campeão"):
+    """
+    Avalia o modelo na base Out-of-Time (OOT) final, exibindo a proporção de fraude
+    e comparando as métricas completas lado a lado com a base Histórica/Teste.
+    """
+    from sklearn.metrics import (
+        roc_auc_score, average_precision_score, accuracy_score,
+        precision_score, recall_score, f1_score, confusion_matrix
+    )
+    from scipy.stats import ks_2samp
+
+    y_hist_arr = np.asarray(y_hist)
+    y_oot_arr = np.asarray(y_oot)
+
+    tx_hist = float(np.mean(y_hist_arr)) * 100
+    tx_oot = float(np.mean(y_oot_arr)) * 100
+    dif_tx = tx_oot - tx_hist
+
+    prob_hist = modelo.predict_proba(X_hist)[:, 1]
+    pred_hist = (prob_hist >= threshold).astype(int)
+    pos_h, neg_h = prob_hist[y_hist_arr == 1], prob_hist[y_hist_arr == 0]
+    met_hist = {
+        'ROC-AUC': roc_auc_score(y_hist_arr, prob_hist),
+        'PR-AUC': average_precision_score(y_hist_arr, prob_hist),
+        'KS': ks_2samp(pos_h, neg_h).statistic if (len(pos_h) > 0 and len(neg_h) > 0) else 0.0,
+        'Accuracy': accuracy_score(y_hist_arr, pred_hist),
+        'Precision': precision_score(y_hist_arr, pred_hist, zero_division=0),
+        'Recall': recall_score(y_hist_arr, pred_hist, zero_division=0),
+        'F1-Score': f1_score(y_hist_arr, pred_hist, zero_division=0),
+    }
+
+    prob_oot = modelo.predict_proba(X_oot)[:, 1]
+    pred_oot = (prob_oot >= threshold).astype(int)
+    pos_o, neg_o = prob_oot[y_oot_arr == 1], prob_oot[y_oot_arr == 0]
+    met_oot = {
+        'ROC-AUC': roc_auc_score(y_oot_arr, prob_oot),
+        'PR-AUC': average_precision_score(y_oot_arr, prob_oot),
+        'KS': ks_2samp(pos_o, neg_o).statistic if (len(pos_o) > 0 and len(neg_o) > 0) else 0.0,
+        'Accuracy': accuracy_score(y_oot_arr, pred_oot),
+        'Precision': precision_score(y_oot_arr, pred_oot, zero_division=0),
+        'Recall': recall_score(y_oot_arr, pred_oot, zero_division=0),
+        'F1-Score': f1_score(y_oot_arr, pred_oot, zero_division=0),
+    }
+
+    print("=" * 80)
+    print(f" DESEMPENHO OOT FINAL: {nome_modelo.upper()}")
+    print(f" Threshold aplicado: {threshold:.4f}")
+    print("-" * 80)
+
+    fmt_dif_tx = f"+{dif_tx:.2f}%" if dif_tx >= 0 else f"{dif_tx:.2f}%"
+    print(" DISTRIBUIÇÃO DO TARGET (FRAUDE / isFraud)")
+    print(f"  -> Histórico/Teste : {tx_hist:.2f}%")
+    print(f"  -> OOT Final       : {tx_oot:.2f}% (Variação: {fmt_dif_tx})")
+    print("-" * 80)
+
+    print(f"  {'Métrica':<15} | {'Histórico/Teste':<15} | {'OOT Final':<15} | {'Variação (Drop)'}")
+    print(f"  {'-'*15} | {'-'*15} | {'-'*15} | {'-'*15}")
+
+    for metrica in met_hist.keys():
+        val_h = met_hist[metrica]
+        val_o = met_oot[metrica]
+        diff = val_o - val_h
+        print(f"  {metrica:<15} | {val_h:<15.4f} | {val_o:<15.4f} | {diff:>+8.4f}")
+
+    print("=" * 80)
+    print("\nMatriz de Confusão (OOT Final):")
+    print(confusion_matrix(y_oot_arr, pred_oot))
+
+    return prob_oot, pred_oot
 
 def comparar_matrizes_cv(modelos_dict, thresholds_dict, X, y, cv=5):
     """
@@ -2248,80 +2338,6 @@ def comparar_matrizes_cv(modelos_dict, thresholds_dict, X, y, cv=5):
         
     plt.tight_layout()
     plt.show()
-
-
-def avaliar_classificacao_oot(modelo, X_test, y_test, X_hist, y_hist, threshold, nome_modelo="Modelo Campeão"):
-    """
-    Avalia o modelo na base Out-of-Time (OOT), exibindo a proporção do target 
-    e comparando as métricas finais lado a lado com a base Histórica.
-    """
-    # 1. Distribuição do Target (% de Chuva)
-    tx_hist = y_hist.mean() * 100
-    tx_oot = y_test.mean() * 100
-    dif_tx = tx_oot - tx_hist
-    
-    # 2. Previsões e Métricas: Base Histórica (Baseline)
-    prob_hist = modelo.predict_proba(X_hist)[:, 1]
-    pred_hist = (prob_hist >= threshold).astype(int)
-    
-    met_hist = {
-        'Accuracy': accuracy_score(y_hist, pred_hist),
-        'Precision': precision_score(y_hist, pred_hist, zero_division=0),
-        'Recall': recall_score(y_hist, pred_hist),
-        'F1-Score': f1_score(y_hist, pred_hist),
-        'ROC-AUC': roc_auc_score(y_hist, prob_hist),
-        'PR-AUC': average_precision_score(y_hist, prob_hist)
-    }
-    ks_hist, _ = ks_2samp(prob_hist[y_hist == 1], prob_hist[y_hist == 0])
-    met_hist['KS'] = ks_hist
-
-    # 3. Previsões e Métricas: Base OOT (Teste atual)
-    prob_oot = modelo.predict_proba(X_test)[:, 1]
-    pred_oot = (prob_oot >= threshold).astype(int)
-    
-    met_oot = {
-        'Accuracy': accuracy_score(y_test, pred_oot),
-        'Precision': precision_score(y_test, pred_oot, zero_division=0),
-        'Recall': recall_score(y_test, pred_oot),
-        'F1-Score': f1_score(y_test, pred_oot),
-        'ROC-AUC': roc_auc_score(y_test, prob_oot),
-        'PR-AUC': average_precision_score(y_test, prob_oot)
-    }
-    ks_oot, _ = ks_2samp(prob_oot[y_test == 1], prob_oot[y_test == 0])
-    met_oot['KS'] = ks_oot
-
-    # 4. Exibição da Tabela
-    print("=" * 80)
-    print(f" DESEMPENHO OOT: {nome_modelo.upper()}")
-    print(f" Threshold aplicado: {threshold:.4f}")
-    print("-" * 80)
-    
-    # Bloco do Target Drift
-    fmt_dif_tx = f"+{dif_tx:.2f}%" if dif_tx >= 0 else f"{dif_tx:.2f}%"
-    print(f" DISTRIBUIÇÃO DO TARGET (CHUVAS)")
-    print(f"  -> Histórico : {tx_hist:.2f}%")
-    print(f"  -> Teste/OOT : {tx_oot:.2f}% (Variação: {fmt_dif_tx})")
-    print("-" * 80)
-    
-    # Bloco de Comparação de Métricas
-    print(f"  {'Métrica':<15} | {'Histórico':<15} | {'Teste/OOT':<15} | {'Variação (Drop)'}")
-    print(f"  {'-'*15} | {'-'*15} | {'-'*15} | {'-'*15}")
-    
-    for metrica in met_hist.keys():
-        val_h = met_hist[metrica]
-        val_o = met_oot[metrica]
-        diff = val_o - val_h
-        
-        fmt_diff = f"{diff:>+8.4f}"
-
-        
-        print(f"  {metrica:<15} | {val_h:<15.4f} | {val_o:<15.4f} | {fmt_diff}")
-        
-    print("=" * 80)
-    print("\nMatriz de Confusão (Teste/OOT):")
-    print(confusion_matrix(y_test, pred_oot))
-    
-    return prob_oot, pred_oot
 
 
 def gerar_tabela_sazonalidade_oot(modelo, X_hist, y_hist, df_oot, target_col, threshold, col_mes='Month'):
@@ -3504,6 +3520,9 @@ analisar_multicolinearidade_pares = analise_correlacao_pares
 analisar_multicolinearidade = analise_correlacao_pares
 
 
+import numpy as np
+import pandas as pd
+
 def calcular_iv_dataset(
     df: pd.DataFrame,
     target_col: str = 'isFraud',
@@ -3511,7 +3530,7 @@ def calcular_iv_dataset(
 ) -> pd.DataFrame:
     """
     Calcula o Information Value (IV) para todas as features preditoras do DataFrame,
-    classificando a relevância preditiva segundo as faixas de Siddiqi.
+    com a régua de diagnóstico adaptada para Detecção de Fraude Transacional.
 
     Parâmetros
     ----------
@@ -3525,7 +3544,7 @@ def calcular_iv_dataset(
     Retorna
     -------
     pd.DataFrame
-        Tabela ordenada por `Information_Value` decrescente com o diagnóstico de cada variável.
+        Tabela ordenada por `Information_Value` decrescente com o diagnóstico ajustado.
     """
     iv_resultados = []
 
@@ -3562,16 +3581,20 @@ def calcular_iv_dataset(
         tabela['woe'] = np.log(tabela['dist_bons'] / tabela['dist_maus'])
         iv_total = float(((tabela['dist_bons'] - tabela['dist_maus']) * tabela['woe']).sum())
 
+        # ---------------------------------------------------------
+        # RÉGUA DE DIAGNÓSTICO ADAPTADA PARA FRAUDE TRANSACIONAL
+        # ---------------------------------------------------------
         if iv_total < 0.02:
             status = 'Sem Poder Preditivo'
         elif iv_total < 0.10:
             status = 'Poder Fraco'
         elif iv_total < 0.30:
             status = 'Poder Médio'
-        elif iv_total <= 0.50:
+        elif iv_total < 0.80:
             status = 'Poder Forte'
         else:
-            status = 'Alerta: Suspeito / Leakage'
+            # Substitui o "Leakage" de Siddiqi por um reconhecimento de sinais extremos de fraude
+            status = 'Poder Altíssimo (Padrão Fraude)'
 
         iv_resultados.append({
             'Feature': col,
@@ -3752,4 +3775,1954 @@ def prune_multicollinearity(
     else:
         print("Multicolinearidade: nenhuma coluna da lista encontrada para remoção.")
     return df
+
+def analisar_e_transformar_caudas_longas(
+    df: pd.DataFrame,
+    limiar_skew: float = 1.0,
+    min_unicos: int = 10,
+    substituir_original: bool = False,
+    plotar_top: int = 3
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Diagnostica assimetria (skewness) em variáveis numéricas contínuas/discretas,
+    aplica np.log1p apenas onde é matematicamente seguro (min >= 0 e nunique > min_unicos)
+    e compara o antes e depois.
+    """
+    df_out = df.copy()
+    cols_ignorar = {'TransactionID', 'isFraud', 'TransactionDT'}
+    
+    # 1. Seleciona apenas colunas numéricas candidatas (exclui flags binárias e chaves)
+    candidatas = []
+    for col in df_out.select_dtypes(include=[np.number]).columns:
+        if col in cols_ignorar or col.endswith('_num') or col.startswith(('has_', 'is_')):
+            continue
+        if df_out[col].nunique(dropna=True) > min_unicos:
+            candidatas.append(col)
+
+    # 2. Calcula assimetria e estatísticas de suporte
+    skews = df_out[candidatas].skew(skipna=True)
+    mins  = df_out[candidatas].min(skipna=True)
+    maxs  = df_out[candidatas].max(skipna=True)
+
+    relatorio = []
+    cols_transformadas = []
+
+    for col in candidatas:
+        skew_val = skews[col]
+        min_val  = mins[col]
+        max_val  = maxs[col]
+
+        if skew_val > limiar_skew:
+            if min_val >= 0:
+                serie_log = np.log1p(df_out[col]).astype('float32')
+                skew_novo = float(serie_log.skew(skipna=True))
+                
+                target_col = col if substituir_original else f"{col}_log"
+                df_out[target_col] = serie_log
+                cols_transformadas.append((col, target_col, skew_val, skew_novo))
+                status = "Transformada (log1p)"
+            else:
+                skew_novo = skew_val
+                status = f"Ignorada (min={min_val:.1f} < 0)"
+        else:
+            skew_novo = skew_val
+            status = "Simétrica / Aceitável"
+
+        relatorio.append({
+            "Feature": col,
+            "Min": round(float(min_val), 2),
+            "Max": round(float(max_val), 2),
+            "Skew_Antes": round(float(skew_val), 2),
+            "Skew_Depois": round(float(skew_novo), 2),
+            "Status": status
+        })
+
+    df_relatorio = (
+        pd.DataFrame(relatorio)
+        .sort_values(by="Skew_Antes", ascending=False)
+        .reset_index(drop=True)
+    )
+
+    print(f"Total de colunas avaliadas      : {len(candidatas)}")
+    print(f"Colunas com Skew > {limiar_skew} (log1p): {len(cols_transformadas)}")
+    print(f"Ignoradas por valores negativos : {(df_relatorio['Status'].str.startswith('Ignorada')).sum()}")
+
+    # 3. Plot comparativo (Antes vs. Depois) das Top N features com maior redução de cauda
+    if plotar_top > 0 and len(cols_transformadas) > 0:
+        # Prioriza features de negócio conhecidas se estiverem na lista, senão pega as maiores
+        destaques = [t for t in cols_transformadas if t[0] in ['TransactionAmt', 'dist1', 'C1', 'C13', 'D1']]
+        if len(destaques) < plotar_top:
+            restante = [t for t in cols_transformadas if t not in destaques]
+            destaques.extend(restante[:plotar_top - len(destaques)])
+        destaques = destaques[:plotar_top]
+
+        fig, axes = plt.subplots(len(destaques), 2, figsize=(13, 3.5 * len(destaques)))
+        if len(destaques) == 1:
+            axes = np.array([axes])
+
+        for idx, (col_orig, col_log, sk_old, sk_new) in enumerate(destaques):
+            # Antes (usa df original caso substituir_original=True)
+            dados_orig = df[col_orig].dropna()
+            dados_log  = df_out[col_log].dropna()
+
+            sns.histplot(dados_orig, bins=50, ax=axes[idx, 0], color='#d62728', kde=False)
+            axes[idx, 0].set_title(f"{col_orig} — Original (Skew: {sk_old:.2f})")
+            axes[idx, 0].set_yscale('log') # Escala log no eixo Y para enxergar a cauda
+
+            sns.histplot(dados_log, bins=50, ax=axes[idx, 1], color='#1f77b4', kde=True)
+            axes[idx, 1].set_title(f"{col_log} — Pós log1p (Skew: {sk_new:.2f})")
+
+        plt.tight_layout()
+        plt.show()
+
+    return df_out, df_relatorio
+
+
+# ==============================================================================
+# FUNÇÕES DE MODELAGEM E OTIMIZAÇÃO (ADICIONADAS DE UTILS_3)
+# ==============================================================================
+
+def preparar_dados_modelagem(
+    df_master: pd.DataFrame,
+    meta: Optional[dict] = None,
+    train_ratio: float = 0.60,
+    test_ratio: float = 0.20,
+) -> dict:
+    """
+    Realiza a divisão temporal estrita em 3 blocos cronológicos:
+    - Treino (`train_ratio`, padrão 60% iniciais)
+    - Teste de validação (`test_ratio`, padrão 20% seguintes)
+    - Out-of-Time final (`1 - train_ratio - test_ratio`, padrão 20% finais cegos)
+
+    Aplica ancoragem de drift nas colunas D, engenharia de grupo e frequency encoding
+    fitados EXCLUSIVAMENTE no Treino (`train_df`), ordinal encoding sem leakage, cálculo
+    da taxa de desbalanceamento e blocos mensais (`grupos_mes`) apenas no Treino.
+    """
+    from sklearn.preprocessing import OrdinalEncoder
+
+    if train_ratio <= 0 or test_ratio <= 0 or (train_ratio + test_ratio) >= 1.0:
+        raise ValueError("`train_ratio` e `test_ratio` devem ser > 0 e somar menos que 1.0 para preservar o bloco OOT.")
+
+    meta = meta or {}
+
+    # 1. Ordenação estritamente cronológica em 3 blocos: Treino (60%) | Teste (20%) | OOT (20%)
+    df_sorted = df_master.sort_values("TransactionDT").reset_index(drop=True)
+    n_total = len(df_sorted)
+    idx_train = int(n_total * train_ratio)
+    idx_test = int(n_total * (train_ratio + test_ratio))
+
+    train_df = df_sorted.iloc[:idx_train].copy()
+    test_df  = df_sorted.iloc[idx_train:idx_test].copy()
+    oot_df   = df_sorted.iloc[idx_test:].copy()
+
+    # 2. Normalização de Drift nas Colunas D (Transformação determinística linha a linha)
+    for df_part in (train_df, test_df, oot_df):
+        dia_tx = df_part["TransactionDT"] / (3600.0 * 24.0)
+        cols_d = [c for c in df_part.columns if c.startswith("D") and c[1:].isdigit()]
+        for col in cols_d:
+            df_part[f"{col}_ancora"] = (df_part[col] - dia_tx).astype("float32")
+        if cols_d:
+            df_part.drop(columns=cols_d, inplace=True)
+
+    # 3. Engenharia de Grupo fitada EXCLUSIVAMENTE no Treino (Prevenção estrita de Leakage)
+    novas_cols_grupo = []
+    if 'card1' in train_df.columns and 'TransactionAmt' in train_df.columns:
+        card1_stats = train_df.groupby("card1")["TransactionAmt"].mean()
+        global_mean = train_df["TransactionAmt"].mean()
+
+        for df_part in (train_df, test_df, oot_df):
+            df_part["TransactionAmt_to_mean_card1"] = (
+                df_part["TransactionAmt"] / (df_part["card1"].map(card1_stats).fillna(global_mean) + 1e-5)
+            ).astype("float32")
+        novas_cols_grupo.append("TransactionAmt_to_mean_card1")
+
+    # 4. Frequency Encoding fitado EXCLUSIVAMENTE no Treino
+    cols_to_encode = ["card1", "card2", "addr1", "P_emaildomain"]
+    for col in cols_to_encode:
+        if col in train_df.columns:
+            freq_map = train_df[col].value_counts(dropna=False)
+            for df_part in (train_df, test_df, oot_df):
+                df_part[f"{col}_freq"] = df_part[col].map(freq_map).fillna(0).astype("float32")
+            novas_cols_grupo.append(f"{col}_freq")
+
+    # 5. Consolidação de Colunas (Remoção de IDs brutos que causam memorização)
+    cols_memorizacao = {'TransactionID', 'isFraud', 'TransactionDT', 'card1', 'card2', 'addr1', 'addr2'}
+    features_base = [c for c in train_df.columns if c not in cols_memorizacao]
+    features_cols = list(dict.fromkeys(features_base + novas_cols_grupo))
+
+    linear_cols = [c for c in meta.get("linear_baseline_features", []) if c in features_cols]
+    cat_cols = train_df[features_cols].select_dtypes(include=['object', 'category']).columns.tolist()
+
+    X_train = train_df[features_cols].copy()
+    X_test  = test_df[features_cols].copy()
+    X_oot   = oot_df[features_cols].copy()
+
+    # Fallback defensivo para linear_cols se não houver lista salva em metadata
+    if not linear_cols:
+        linear_cols = [c for c in X_train.select_dtypes(include=[np.number]).columns if c not in cols_memorizacao][:50]
+
+    # 6. Ordinal Encoding fitado APENAS no Treino (evita leakage de categorias futuras)
+    if cat_cols:
+        cat_train_df = pd.DataFrame(index=train_df.index)
+        cat_test_df  = pd.DataFrame(index=test_df.index)
+        cat_oot_df   = pd.DataFrame(index=oot_df.index)
+        for c in cat_cols:
+            cat_train_df[c] = train_df[c].astype(object).fillna("Missing").astype(str)
+            cat_test_df[c]  = test_df[c].astype(object).fillna("Missing").astype(str)
+            cat_oot_df[c]   = oot_df[c].astype(object).fillna("Missing").astype(str)
+            train_df[c]     = cat_train_df[c]
+            test_df[c]      = cat_test_df[c]
+            oot_df[c]       = cat_oot_df[c]
+
+        ord_enc = OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1)
+        X_train[cat_cols] = ord_enc.fit_transform(cat_train_df[cat_cols]).astype("int32")
+        X_test[cat_cols]  = ord_enc.transform(cat_test_df[cat_cols]).astype("int32")
+        X_oot[cat_cols]   = ord_enc.transform(cat_oot_df[cat_cols]).astype("int32")
+
+    X_train = X_train.replace([np.inf, -np.inf], np.nan)
+    X_test  = X_test.replace([np.inf, -np.inf], np.nan)
+    X_oot   = X_oot.replace([np.inf, -np.inf], np.nan)
+
+    y_train = train_df["isFraud"].astype('int8')
+    y_test  = test_df["isFraud"].astype('int8')
+    y_oot   = oot_df["isFraud"].astype('int8')
+
+    # 7. Taxa de Desbalanceamento e Blocos Mensais (GroupKFold apenas no Treino)
+    taxa_desbalanceamento = float((y_train == 0).sum() / max(1, (y_train == 1).sum()))
+    grupos_mes = (train_df["TransactionDT"] // (3600 * 24 * 30)).astype(int).values
+
+    print("-" * 65)
+    print(f"X_train shape ({train_ratio*100:.0f}%): {X_train.shape} | Taxa de Fraude: {y_train.mean()*100:.2f}%")
+    print(f"X_test  shape ({test_ratio*100:.0f}%): {X_test.shape}  | Taxa de Fraude: {y_test.mean()*100:.2f}%")
+    print(f"X_oot   shape ({(1-train_ratio-test_ratio)*100:.0f}%): {X_oot.shape}  | Taxa de Fraude: {y_oot.mean()*100:.2f}%  [BLINDADO P/ AVALIAÇÃO FINAL]")
+    print(f"Total de features preditoras: {len(features_cols)}")
+    print(f"Features lineares (LR): {len(linear_cols)}")
+    print(f"Taxa de desbalanceamento (Treino): {taxa_desbalanceamento:.2f}:1")
+    print(f"Blocos mensais no Treino (GroupKFold): {np.unique(grupos_mes).tolist()} (Total: {len(np.unique(grupos_mes))} meses)")
+    print("-" * 65)
+
+    return {
+        'X_train': X_train,
+        'X_test': X_test,
+        'X_oot': X_oot,
+        'y_train': y_train,
+        'y_test': y_test,
+        'y_oot': y_oot,
+        'features_cols': features_cols,
+        'linear_cols': linear_cols,
+        'cat_cols': cat_cols,
+        'taxa_desbalanceamento': taxa_desbalanceamento,
+        'grupos_mes': grupos_mes,
+        'train_df': train_df,
+        'test_df': test_df,
+        'oot_df': oot_df,
+    }
+
+
+def _resolver_taxa_e_groups(taxa_desbalanceamento, groups):
+    """
+    Identifica de forma defensiva se os argumentos foram passados em ordem invertida
+    ou posicional (ex: groups no 5º argumento ao invés de taxa_desbalanceamento).
+    """
+    if groups is None and isinstance(taxa_desbalanceamento, (np.ndarray, pd.Series, list)):
+        return None, taxa_desbalanceamento
+    if isinstance(taxa_desbalanceamento, (np.ndarray, pd.Series, list)):
+        g = taxa_desbalanceamento
+        t = float(groups) if (groups is not None and isinstance(groups, (int, float))) else None
+        return t, g
+    t = float(taxa_desbalanceamento) if (taxa_desbalanceamento is not None and isinstance(taxa_desbalanceamento, (int, float))) else None
+    g = groups if isinstance(groups, (np.ndarray, pd.Series, list)) else None
+    return t, g
+
+
+def objective_lgbm(
+    trial,
+    X_tune,
+    y_tune,
+    cv,
+    taxa_desbalanceamento: Optional[Union[float, np.ndarray, pd.Series, list]] = None,
+    groups: Optional[Union[np.ndarray, pd.Series, list]] = None
+):
+    """Funcao objetivo Optuna para LightGBM. Maximiza ROC-AUC via CV (suporta GroupKFold via groups)."""
+    from lightgbm import LGBMClassifier
+    from sklearn.metrics import roc_auc_score
+
+    taxa, grps = _resolver_taxa_e_groups(taxa_desbalanceamento, groups)
+
+    params = {
+        'n_estimators': trial.suggest_int('n_estimators', 100, 350),
+        'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.1, log=True),
+        'num_leaves': trial.suggest_int('num_leaves', 20, 100),
+        'max_depth': trial.suggest_int('max_depth', 3, 10),
+        'subsample': trial.suggest_float('subsample', 0.6, 1.0),
+        'colsample_bytree': trial.suggest_float('colsample_bytree', 0.6, 1.0),
+        'reg_alpha': trial.suggest_float('reg_alpha', 1e-2, 10.0, log=True),
+        'reg_lambda': trial.suggest_float('reg_lambda', 1e-2, 10.0, log=True),
+        'random_state': 42,
+        'n_jobs': -1,
+        'verbosity': -1,
+    }
+    if taxa is not None:
+        params['scale_pos_weight'] = taxa
+    else:
+        params['class_weight'] = 'balanced'
+
+    modelo = LGBMClassifier(**params)
+    auc_scores = []
+    splits = cv.split(X_tune, y_tune, groups=grps) if grps is not None else cv.split(X_tune, y_tune)
+    for tr_idx, val_idx in splits:
+        X_tr = X_tune.iloc[tr_idx] if hasattr(X_tune, 'iloc') else X_tune[tr_idx]
+        y_tr = y_tune.iloc[tr_idx] if hasattr(y_tune, 'iloc') else y_tune[tr_idx]
+        X_va = X_tune.iloc[val_idx] if hasattr(X_tune, 'iloc') else X_tune[val_idx]
+        y_va = y_tune.iloc[val_idx] if hasattr(y_tune, 'iloc') else y_tune[val_idx]
+
+        modelo.fit(X_tr, y_tr)
+        probs = modelo.predict_proba(X_va)[:, 1]
+        auc_scores.append(roc_auc_score(np.asarray(y_va), probs))
+    return float(np.mean(auc_scores))
+
+
+def objective_xgb(
+    trial,
+    X_tune,
+    y_tune,
+    cv,
+    taxa_desbalanceamento: Union[float, np.ndarray, pd.Series, list] = 1.0,
+    groups: Optional[Union[np.ndarray, pd.Series, list]] = None
+):
+    """Funcao objetivo Optuna para XGBoost. Maximiza ROC-AUC via CV (suporta GroupKFold via groups)."""
+    from xgboost import XGBClassifier
+    from sklearn.metrics import roc_auc_score
+
+    taxa, grps = _resolver_taxa_e_groups(taxa_desbalanceamento, groups)
+    if taxa is None:
+        taxa = 1.0
+
+    params = {
+        'n_estimators': trial.suggest_int('n_estimators', 100, 350),
+        'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.1, log=True),
+        'max_depth': trial.suggest_int('max_depth', 3, 8),
+        'subsample': trial.suggest_float('subsample', 0.6, 1.0),
+        'colsample_bytree': trial.suggest_float('colsample_bytree', 0.6, 1.0),
+        'reg_alpha': trial.suggest_float('reg_alpha', 1e-2, 10.0, log=True),
+        'reg_lambda': trial.suggest_float('reg_lambda', 1e-2, 10.0, log=True),
+        'scale_pos_weight': taxa,
+        'eval_metric': 'auc',
+        'tree_method': 'hist',
+        'n_jobs': -1,
+        'random_state': 42,
+        'verbosity': 0,
+    }
+
+    modelo = XGBClassifier(**params)
+    auc_scores = []
+    splits = cv.split(X_tune, y_tune, groups=grps) if grps is not None else cv.split(X_tune, y_tune)
+    for tr_idx, val_idx in splits:
+        X_tr = X_tune.iloc[tr_idx] if hasattr(X_tune, 'iloc') else X_tune[tr_idx]
+        y_tr = y_tune.iloc[tr_idx] if hasattr(y_tune, 'iloc') else y_tune[tr_idx]
+        X_va = X_tune.iloc[val_idx] if hasattr(X_tune, 'iloc') else X_tune[val_idx]
+        y_va = y_tune.iloc[val_idx] if hasattr(y_tune, 'iloc') else y_tune[val_idx]
+
+        modelo.fit(X_tr, y_tr, verbose=False)
+        probs = modelo.predict_proba(X_va)[:, 1]
+        auc_scores.append(roc_auc_score(np.asarray(y_va), probs))
+    return float(np.mean(auc_scores))
+
+
+def objective_cat(
+    trial,
+    X_tune,
+    y_tune,
+    cv,
+    taxa_desbalanceamento: Optional[Union[float, np.ndarray, pd.Series, list]] = None,
+    groups: Optional[Union[np.ndarray, pd.Series, list]] = None
+):
+    """Funcao objetivo Optuna para CatBoost. Maximiza ROC-AUC via CV (suporta GroupKFold via groups)."""
+    from catboost import CatBoostClassifier
+    from sklearn.metrics import roc_auc_score
+
+    taxa, grps = _resolver_taxa_e_groups(taxa_desbalanceamento, groups)
+
+    params = {
+        'iterations': trial.suggest_int('iterations', 100, 350),
+        'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.1, log=True),
+        'depth': trial.suggest_int('depth', 3, 8),
+        'l2_leaf_reg': trial.suggest_float('l2_leaf_reg', 1.0, 10.0),
+        'eval_metric': 'AUC',
+        'random_seed': 42,
+        'verbose': False,
+        'thread_count': -1,
+    }
+    if taxa is not None:
+        params['scale_pos_weight'] = taxa
+    else:
+        params['auto_class_weights'] = 'Balanced'
+
+    modelo = CatBoostClassifier(**params)
+    auc_scores = []
+    splits = cv.split(X_tune, y_tune, groups=grps) if grps is not None else cv.split(X_tune, y_tune)
+    for tr_idx, val_idx in splits:
+        X_tr = X_tune.iloc[tr_idx] if hasattr(X_tune, 'iloc') else X_tune[tr_idx]
+        y_tr = y_tune.iloc[tr_idx] if hasattr(y_tune, 'iloc') else y_tune[tr_idx]
+        X_va = X_tune.iloc[val_idx] if hasattr(X_tune, 'iloc') else X_tune[val_idx]
+        y_va = y_tune.iloc[val_idx] if hasattr(y_tune, 'iloc') else y_tune[val_idx]
+
+        modelo.fit(X_tr, y_tr)
+        probs = modelo.predict_proba(X_va)[:, 1]
+        auc_scores.append(roc_auc_score(np.asarray(y_va), probs))
+    return float(np.mean(auc_scores))
+
+
+# Alias de conveniência
+objective_lgbm_grouped = objective_lgbm
+objective_xgb_grouped = objective_xgb
+objective_cat_grouped = objective_cat
+
+def obter_menores_features(
+    modelo,
+    X_amostra: pd.DataFrame,
+    bottom_n: int = 20,
+    exibir: bool = True,
+) -> pd.DataFrame:
+    """
+    Calcula a média absoluta dos SHAP values (|SHAP|) para cada variável em uma amostra
+    e retorna/exibe as variáveis com menor impacto ('fraqueza' preditiva).
+    """
+    try:
+        import shap
+    except ImportError:
+        print("[AVISO] A biblioteca 'shap' não está instalada. Execute: pip install shap")
+        return pd.DataFrame()
+
+    try:
+        from IPython.display import display
+    except ImportError:
+        display = print
+
+    clf = modelo
+    if hasattr(modelo, 'named_steps'):
+        if 'clf' in modelo.named_steps:
+            clf = modelo.named_steps['clf']
+        elif 'classifier' in modelo.named_steps:
+            clf = modelo.named_steps['classifier']
+        elif 'model' in modelo.named_steps:
+            clf = modelo.named_steps['model']
+        else:
+            clf = modelo[-1]
+
+    try:
+        explainer = shap.TreeExplainer(clf)
+        shap_values = explainer.shap_values(X_amostra)
+    except Exception:
+        explainer = shap.Explainer(clf, X_amostra)
+        shap_values = explainer(X_amostra).values
+
+    if isinstance(shap_values, list):
+        shap_matriz = shap_values[1]
+    elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 3:
+        shap_matriz = shap_values[:, :, 1]
+    else:
+        shap_matriz = shap_values
+
+    shap_media_abs = np.abs(shap_matriz).mean(axis=0)
+
+    df_bottom = (
+        pd.DataFrame({
+            'Feature': list(X_amostra.columns),
+            'fraqueza': shap_media_abs
+        })
+        .sort_values('fraqueza', ascending=True)
+        .head(bottom_n)
+        .reset_index(drop=True)
+    )
+
+    if exibir:
+        display(df_bottom)
+
+    return df_bottom
+
+
+def podar_features_por_shap(dicionario_modelos, X_train, y_train, X_test, y_test, X_amostra, top_n_remover=8):
+    """
+    Para cada modelo de árvore:
+      1. calcula o impacto global |SHAP| médio via TreeExplainer em X_amostra;
+      2. identifica as `top_n_remover` features de menor impacto;
+      3. re-treina uma versão LITE (mesmos hiperparâmetros) sem essas features;
+      4. compara o ROC-AUC original vs LITE em X_test (aceita se delta >= -0.0010).
+    """
+    try:
+        import shap
+    except ImportError:
+        print("[AVISO] A biblioteca 'shap' não está instalada. Execute: pip install shap")
+        return {}
+
+    from sklearn.metrics import roc_auc_score
+
+    features_sugeridas_para_corte = {}
+
+    for nome, modelo in dicionario_modelos.items():
+        if 'Pipeline' in str(type(modelo)) or 'Logistic' in nome:
+            continue
+
+        print(f'\n{"=" * 65}')
+        print(f' ANALISE SHAP E SANITY CHECK DE PODA: {nome} ')
+        print(f'{"=" * 65}')
+
+        try:
+            explainer = shap.TreeExplainer(modelo)
+            shap_values = explainer.shap_values(X_amostra)
+        except Exception:
+            explainer = shap.Explainer(modelo, X_amostra)
+            shap_values = explainer(X_amostra).values
+
+        if isinstance(shap_values, list):
+            shap_values_positivos = shap_values[1]
+        elif isinstance(shap_values, np.ndarray) and shap_values.ndim == 3:
+            shap_values_positivos = shap_values[:, :, 1]
+        else:
+            shap_values_positivos = shap_values
+
+        importancia_global = np.abs(shap_values_positivos).mean(axis=0)
+        df_importancia = pd.DataFrame({
+            'Feature': list(X_amostra.columns),
+            'SHAP_Impact': importancia_global
+        }).sort_values(by='SHAP_Impact', ascending=True)
+
+        piores_features = df_importancia.head(top_n_remover)['Feature'].tolist()
+
+        print(f'As {top_n_remover} features menos relevantes:')
+        for f in piores_features:
+            print(f'  - {f}')
+
+        probs_originais = modelo.predict_proba(X_test)[:, 1]
+        auc_original = roc_auc_score(np.asarray(y_test), probs_originais)
+
+        X_train_podado = X_train.drop(columns=piores_features)
+        X_test_podado  = X_test.drop(columns=piores_features)
+
+        modelo_podado = modelo.__class__(**modelo.get_params())
+        print(f'\nTreinando arquitetura LITE sem {top_n_remover} features...')
+        if 'CatBoost' in nome or 'XGB' in nome:
+            modelo_podado.fit(X_train_podado, y_train, verbose=False)
+        else:
+            modelo_podado.fit(X_train_podado, y_train)
+
+        probs_podadas = modelo_podado.predict_proba(X_test_podado)[:, 1]
+        auc_podado = roc_auc_score(np.asarray(y_test), probs_podadas)
+        delta_auc = auc_podado - auc_original
+
+        print(f'  ROC-AUC Original : {auc_original:.4f}')
+        print(f'  ROC-AUC Lite     : {auc_podado:.4f}')
+        print(f'  Delta (AUC)      : {delta_auc:+.4f}')
+
+        if delta_auc >= -0.0010:
+            print('\n  [VEREDITO] Valido! Modelo mais limpo e rapido sem perda significativa.')
+            features_sugeridas_para_corte[nome] = piores_features
+        else:
+            print('\n  [VEREDITO] Rejeitado! Features tinham interacoes ocultas.')
+            features_sugeridas_para_corte[nome] = []
+
+    return features_sugeridas_para_corte
+
+def extrair_metricas_avaliacao(modelo, X, y, threshold=0.5):
+    """
+    Calcula dicionário com métricas completas de avaliação em uma partição:
+    accuracy, precision, recall, f1_score, roc_auc, pr_auc e ks.
+    """
+    from sklearn.metrics import (
+        accuracy_score, precision_score, recall_score, f1_score,
+        roc_auc_score, average_precision_score
+    )
+    from scipy.stats import ks_2samp
+
+    y_arr = np.asarray(y)
+    probs = modelo.predict_proba(X)[:, 1]
+    preds = (probs >= threshold).astype(int)
+
+    pos_probs = probs[y_arr == 1]
+    neg_probs = probs[y_arr == 0]
+    ks_val = float(ks_2samp(pos_probs, neg_probs).statistic) if len(pos_probs) > 0 and len(neg_probs) > 0 else 0.0
+
+    metricas = {
+        'threshold': float(threshold),
+        'accuracy': float(accuracy_score(y_arr, preds)),
+        'precision': float(precision_score(y_arr, preds, zero_division=0)),
+        'recall': float(recall_score(y_arr, preds, zero_division=0)),
+        'f1_score': float(f1_score(y_arr, preds, zero_division=0)),
+        'roc_auc': float(roc_auc_score(y_arr, probs)),
+        'pr_auc': float(average_precision_score(y_arr, probs)),
+        'ks': float(ks_val)
+    }
+    return metricas
+
+
+def exportar_artefatos_modelo(
+    nome_modelo,
+    modelo,
+    diretorio_destino,
+    threshold_otimo,
+    features_utilizadas,
+    X_train,
+    y_train,
+    X_test,
+    y_test,
+    X_oot=None,
+    y_oot=None,
+):
+    """
+    Exporta o modelo em .joblib e grava os arquivos estruturados
+    metadata.json e metrics.json (incluindo OOT quando fornecido).
+    """
+    import json
+    from pathlib import Path
+    try:
+        import joblib
+    except ImportError:
+        print("[AVISO] 'joblib' não está instalado. Execute: pip install joblib")
+        return
+
+    dest = Path(diretorio_destino)
+    dest.mkdir(parents=True, exist_ok=True)
+
+    # 1. Serialização do estimador
+    arquivo_modelo = dest / f"{nome_modelo}.joblib"
+    joblib.dump(modelo, arquivo_modelo)
+
+    # 2. Extração dos hiperparâmetros
+    hiperparametros = {}
+    if hasattr(modelo, 'get_params'):
+        try:
+            params_raw = modelo.get_params(deep=False)
+            for k, v in params_raw.items():
+                if isinstance(v, (np.integer,)):
+                    hiperparametros[k] = int(v)
+                elif isinstance(v, (np.floating,)):
+                    hiperparametros[k] = float(v)
+                elif isinstance(v, (int, float, str, bool, list, dict)) or v is None:
+                    hiperparametros[k] = v
+                else:
+                    hiperparametros[k] = str(v)
+        except Exception:
+            hiperparametros = {'info': 'Nao foi possivel serializar get_params()'}
+
+    # 3. Geração do metadata.json
+    metadata = {
+        'nome_modelo': nome_modelo,
+        'classe': f"{modelo.__class__.__module__}.{modelo.__class__.__name__}",
+        'hiperparametros': hiperparametros,
+        'features_utilizadas': list(features_utilizadas),
+        'total_features': len(features_utilizadas),
+        'tamanho_historico_treino': {
+            'linhas': int(len(X_train)),
+            'taxa_alvo': float(np.mean(y_train))
+        },
+        'tamanho_historico_teste': {
+            'linhas': int(len(X_test)),
+            'taxa_alvo': float(np.mean(y_test))
+        }
+    }
+    if X_oot is not None and y_oot is not None:
+        metadata['tamanho_historico_oot'] = {
+            'linhas': int(len(X_oot)),
+            'taxa_alvo': float(np.mean(y_oot))
+        }
+
+    arquivo_metadata = dest / f"{nome_modelo}_metadata.json"
+    with open(arquivo_metadata, 'w', encoding='utf-8') as f:
+        json.dump(metadata, f, indent=2, ensure_ascii=False)
+
+    # 4. Geração do metrics.json
+    metricas_treino = extrair_metricas_avaliacao(modelo, X_train, y_train, threshold=threshold_otimo)
+    metricas_teste  = extrair_metricas_avaliacao(modelo, X_test, y_test, threshold=threshold_otimo)
+
+    metrics_payload = {
+        'nome_modelo': nome_modelo,
+        'threshold_otimo': float(threshold_otimo),
+        'metricas_treino': metricas_treino,
+        'metricas_teste': metricas_teste
+    }
+    if X_oot is not None and y_oot is not None:
+        metrics_payload['metricas_oot'] = extrair_metricas_avaliacao(modelo, X_oot, y_oot, threshold=threshold_otimo)
+
+    arquivo_metrics = dest / f"{nome_modelo}_metrics.json"
+    with open(arquivo_metrics, 'w', encoding='utf-8') as f:
+        json.dump(metrics_payload, f, indent=2, ensure_ascii=False)
+
+    print(f"Artefatos de {nome_modelo} exportados com sucesso em {dest}:")
+    print(f" - {arquivo_modelo.name}")
+    print(f" - {arquivo_metadata.name}")
+    print(f" - {arquivo_metrics.name}")
+
+
+# ==============================================================================
+# FUNÇÕES DE CLUSTERIZAÇÃO, REDUÇÃO DE DIMENSIONALIDADE E PERFILAMENTO DE FRAUDE
+# ==============================================================================
+
+def _salvar_figura_opcional(
+    fig: Any,
+    nome_arquivo: Optional[str] = None,
+    save_dir: Optional[Union[str, Path]] = None,
+    dpi: int = 300,
+) -> None:
+    """Salva figura Matplotlib ou Plotly em disco apenas quando `nome_arquivo` e informado."""
+    if not nome_arquivo:
+        return
+    base_dir = Path(save_dir) if save_dir is not None else (Path.cwd().parent if Path.cwd().name == "notebooks" else Path.cwd()) / "reports" / "figures"
+    base_dir.mkdir(parents=True, exist_ok=True)
+    caminho = base_dir / nome_arquivo
+    if hasattr(fig, "write_html") and str(caminho).endswith(".html"):
+        fig.write_html(str(caminho))
+    elif hasattr(fig, "savefig"):
+        fig.savefig(caminho, dpi=dpi, bbox_inches="tight")
+
+
+def preparar_dados_clusterizacao(
+    df_fraude: pd.DataFrame,
+    meta: Optional[Dict[str, Any]] = None,
+    cols_id_tempo_remover: Optional[List[str]] = None,
+    cols_cat_baixa_card: Optional[List[str]] = None,
+    cols_cat_alta_card: Optional[List[str]] = None,
+    max_ohe_cardinalidade: int = 15,
+    aplicar_log1p_assimetricas: bool = True,
+    limiar_skew_log: float = 1.0,
+    corrigir_drift_d: bool = True,
+) -> Tuple[np.ndarray, pd.DataFrame, List[str], Any]:
+    """Prepara matriz numérica limpa e escalada (RobustScaler) para clusterização de fraudes.
+
+    Etapas aplicadas:
+    1. Ancoragem temporal das colunas D1..D15 (`D - TransactionDT / 86400`), revertendo
+       `expm1` caso alguma coluna D já tenha vindo em escala `log1p` do 01_EDA.
+    2. Remoção de IDs brutos e timestamps arbitrários (`TransactionID`, `TransactionDT`,
+       `card1`, `card2`, `addr1`, `addr2`, além de `isFraud`).
+    3. Codificação de categóricas: `pd.get_dummies(..., dtype=float)` para baixa cardinalidade
+       (ex: `ProductCD`, `card4`, `card6_limpo`, `M1_M2_M3_assinatura`) e Frequency Encoding
+       para alta cardinalidade (ex: `P_emaildomain`, `device_brand`).
+    4. Aplicação de `np.log1p` apenas nas numéricas estritamente não-negativas que ainda
+       apresentem assimetria > `limiar_skew_log` (evita duplo log após o 01_EDA).
+    5. Imputação por mediana (`SimpleImputer`) + escala robusta (`RobustScaler`).
+    """
+    from sklearn.impute import SimpleImputer
+    from sklearn.pipeline import Pipeline
+    from sklearn.preprocessing import RobustScaler
+
+    df_work = df_fraude.copy()
+
+    # 1. Correção de drift das colunas D1..D15 antes de remover TransactionDT
+    cols_d_ancoradas: List[str] = []
+    if corrigir_drift_d and "TransactionDT" in df_work.columns:
+        dias_dt = df_work["TransactionDT"].astype("float64") / 86400.0
+        for i in range(1, 16):
+            col_d = f"D{i}"
+            if col_d in df_work.columns and pd.api.types.is_numeric_dtype(df_work[col_d]):
+                serie_d = df_work[col_d].astype("float64")
+                valid = serie_d.dropna()
+                if not valid.empty and valid.min() >= 0 and valid.max() <= 10.0:
+                    # Caso D tenha passado por log1p no EDA, retorna à escala de dias antes de ancorar
+                    serie_d = np.expm1(serie_d)
+                df_work[col_d] = serie_d - dias_dt
+                cols_d_ancoradas.append(col_d)
+
+    # 2. Remoção de IDs brutos, timestamps e target
+    padrao_remover = ["TransactionID", "isFraud", "TransactionDT", "card1", "card2", "addr1", "addr2"]
+    lista_remover = cols_id_tempo_remover if cols_id_tempo_remover is not None else padrao_remover
+    cols_para_dropar = [c for c in lista_remover if c in df_work.columns]
+    if cols_para_dropar:
+        df_work = df_work.drop(columns=cols_para_dropar)
+
+    # 3. Separação e codificação de categóricas
+    cols_cat_presentes = list(df_work.select_dtypes(include=["object", "category"]).columns)
+    if meta and "cat_features" in meta:
+        meta_cats = [c for c in meta["cat_features"] if c in df_work.columns and c not in cols_cat_presentes]
+        cols_cat_presentes.extend(meta_cats)
+
+    alta_card_padrao = {"P_emaildomain", "device_brand", "P_email_suffix", "browser_family"}
+    if cols_cat_alta_card is not None:
+        cols_alta = [c for c in cols_cat_alta_card if c in cols_cat_presentes]
+    else:
+        cols_alta = [
+            c for c in cols_cat_presentes
+            if c in alta_card_padrao or df_work[c].nunique(dropna=True) > max_ohe_cardinalidade
+        ]
+
+    if cols_cat_baixa_card is not None:
+        cols_baixa = [c for c in cols_cat_baixa_card if c in cols_cat_presentes and c not in cols_alta]
+    else:
+        cols_baixa = [c for c in cols_cat_presentes if c not in cols_alta]
+
+    # Frequency encoding para alta cardinalidade (cria/atualiza versão normalizada no recorte)
+    cols_freq_criadas: List[str] = []
+    for col in cols_alta:
+        serie_str = df_work[col].astype("object").fillna("missing").astype(str)
+        freqs = serie_str.value_counts(normalize=True)
+        nome_freq = f"{col}_cluster_freq"
+        df_work[nome_freq] = serie_str.map(freqs).astype("float64")
+        cols_freq_criadas.append(nome_freq)
+        df_work = df_work.drop(columns=[col])
+
+    # One-Hot Encoding para baixa cardinalidade
+    cols_ohe_criadas: List[str] = []
+    if cols_baixa:
+        for col in cols_baixa:
+            df_work[col] = df_work[col].astype("object").fillna("missing").astype(str)
+        antes_ohe = set(df_work.columns)
+        df_work = pd.get_dummies(df_work, columns=cols_baixa, drop_first=False, dtype=float)
+        cols_ohe_criadas = sorted(list(set(df_work.columns) - antes_ohe))
+
+    # Garante apenas colunas numéricas e limpa infinitos
+    df_work = df_work.select_dtypes(include=[np.number]).replace([np.inf, -np.inf], np.nan)
+
+    # Remove colunas totalmente nulas ou de variância zero
+    cols_validas = [c for c in df_work.columns if df_work[c].notna().any() and df_work[c].nunique(dropna=True) > 1]
+    df_work = df_work[cols_validas].copy()
+
+    # 4. Log1p em numéricas contínuas/assimétricas estritamente não-negativas
+    cols_log1p_aplicadas: List[str] = []
+    if aplicar_log1p_assimetricas:
+        set_ohe = set(cols_ohe_criadas)
+        for col in df_work.columns:
+            if col in set_ohe:
+                continue
+            serie = df_work[col].dropna()
+            if len(serie) < 10 or serie.nunique() <= 2:
+                continue
+            if serie.min() >= 0 and float(serie.skew()) > limiar_skew_log:
+                df_work[col] = np.log1p(df_work[col].astype("float64"))
+                cols_log1p_aplicadas.append(col)
+
+    # 5. Imputação por mediana + RobustScaler
+    feature_names = list(df_work.columns)
+    preprocessador = Pipeline([
+        ("imputer", SimpleImputer(strategy="median")),
+        ("scaler", RobustScaler()),
+    ])
+    X_tratado = preprocessador.fit_transform(df_work)
+
+    print("Pré-processamento de clusterização concluído:")
+    print(f" - Matriz final escalada: {X_tratado.shape[0]:,} linhas x {X_tratado.shape[1]} features")
+    print(f" - D1..D15 ancoradas (drift): {len(cols_d_ancoradas)} {cols_d_ancoradas}")
+    print(f" - Dummies (baixa cardinalidade): {len(cols_ohe_criadas)} colunas de {len(cols_baixa)} originais")
+    print(f" - Frequency encoding (alta card.): {len(cols_freq_criadas)} colunas {cols_alta}")
+    print(f" - Log1p adicional (skew > {limiar_skew_log}): {len(cols_log1p_aplicadas)} colunas")
+
+    return X_tratado, df_work, feature_names, preprocessador
+
+
+def projetar_pca(
+    X_tratado: np.ndarray,
+    n_components: int = 10,
+    random_state: int = 42,
+) -> Tuple[np.ndarray, Any]:
+    """Projeta a matriz escalada em `n_components` componentes principais (PCA)."""
+    from sklearn.decomposition import PCA
+
+    pca = PCA(n_components=n_components, random_state=random_state)
+    X_pca = pca.fit_transform(X_tratado)
+    var_acum = float(pca.explained_variance_ratio_.sum() * 100)
+    print(f"PCA ({n_components}D) concluído | Variância explicada acumulada: {var_acum:.2f}%")
+    return X_pca, pca
+
+
+def plot_pca_variancia_acumulada(
+    pca_model: Any,
+    limiar_referencia: float = 0.70,
+    nome_arquivo: Optional[str] = None,
+    save_dir: Optional[Union[str, Path]] = None,
+) -> plt.Figure:
+    """Plota a variância explicada individual e acumulada dos componentes do PCA."""
+    ratios = pca_model.explained_variance_ratio_
+    acum = np.cumsum(ratios)
+    comps = np.arange(1, len(ratios) + 1)
+
+    fig, ax = plt.subplots(figsize=(9, 4.8))
+    ax.bar(comps, ratios * 100, alpha=0.55, color="#5DADE2", label="Variância Individual (%)")
+    ax.plot(comps, acum * 100, marker="o", linewidth=2.2, color="#C00000", label="Variância Acumulada (%)")
+    ax.axhline(limiar_referencia * 100, color="#27AE60", linestyle="--", linewidth=1.3, label=f"Referência {limiar_referencia*100:.0f}%")
+
+    for c, v in zip(comps, acum * 100):
+        ax.annotate(f"{v:.1f}%", (c, v), textcoords="offset points", xytext=(0, 8), ha="center", fontsize=8.5, fontweight="bold", color="#900C3F")
+
+    ax.set_title("PCA — Variância Explicada Acumulada", fontweight="bold", fontsize=12)
+    ax.set_xlabel("Componente Principal")
+    ax.set_ylabel("Variância Explicada (%)")
+    ax.set_xticks(comps)
+    ax.set_ylim(0, min(105, max(100, acum.max() * 100 + 12)))
+    ax.grid(alpha=0.25)
+    ax.legend(loc="best")
+    sns.despine(ax=ax)
+    plt.tight_layout()
+    _salvar_figura_opcional(fig, nome_arquivo=nome_arquivo, save_dir=save_dir)
+    return fig
+
+
+def projetar_umap(
+    X_tratado: np.ndarray,
+    n_components: int = 10,
+    n_neighbors: int = 40,
+    min_dist: float = 0.0,
+    metric: str = "euclidean",
+    random_state: int = 42,
+) -> Tuple[np.ndarray, Any]:
+    """Projeta a matriz escalada via UMAP (10D para clusterizar com min_dist=0.0 ou 2D para plotar)."""
+    try:
+        import umap
+    except ImportError as exc:
+        raise ImportError("Pacote 'umap-learn' não encontrado. Instale com `pip install umap-learn`.") from exc
+
+    modelo_umap = umap.UMAP(
+        n_components=n_components,
+        n_neighbors=n_neighbors,
+        min_dist=min_dist,
+        metric=metric,
+        random_state=random_state,
+    )
+    X_umap = modelo_umap.fit_transform(X_tratado)
+    print(f"UMAP ({n_components}D | n_neighbors={n_neighbors}, min_dist={min_dist}) concluído: shape {X_umap.shape}")
+    return X_umap, modelo_umap
+
+
+def curva_elbow(
+    X_tratado: np.ndarray,
+    k_range: Iterable[int] = range(2, 13),
+    n_init: int = 10,
+    max_iter: int = 300,
+    random_state: int = 42,
+) -> Dict[int, float]:
+    """Calcula a inércia (SSE) do K-Means ao longo de uma faixa de K (adaptado do Projeto-07)."""
+    from sklearn.cluster import KMeans
+
+    inercias: Dict[int, float] = {}
+    for k in k_range:
+        km = KMeans(n_clusters=k, init="k-means++", n_init=n_init, max_iter=max_iter, random_state=random_state)
+        km.fit(X_tratado)
+        inercias[k] = float(km.inertia_)
+    return inercias
+
+
+def avaliar_kmeans_range(
+    X_tratado: np.ndarray,
+    k_range: Iterable[int] = range(2, 13),
+    sample_size: Optional[int] = 10000,
+    n_init: int = 10,
+    max_iter: int = 300,
+    random_state: int = 42,
+) -> pd.DataFrame:
+    """Varre K-Means para `k_range` calculando Inércia, Silhouette, Davies-Bouldin e Calinski-Harabasz."""
+    from sklearn.cluster import KMeans
+    from sklearn.metrics import calinski_harabasz_score, davies_bouldin_score, silhouette_score
+
+    resultados = []
+    n_amostras = len(X_tratado)
+    sil_sample = sample_size if (sample_size is not None and n_amostras > sample_size) else None
+
+    for k in k_range:
+        km = KMeans(n_clusters=k, init="k-means++", n_init=n_init, max_iter=max_iter, random_state=random_state)
+        labels = km.fit_predict(X_tratado)
+        resultados.append({
+            "K": int(k),
+            "Inercia": float(km.inertia_),
+            "Silhouette": float(silhouette_score(X_tratado, labels, sample_size=sil_sample, random_state=random_state)),
+            "Davies_Bouldin": float(davies_bouldin_score(X_tratado, labels)),
+            "Calinski_Harabasz": float(calinski_harabasz_score(X_tratado, labels)),
+        })
+
+    return pd.DataFrame(resultados)
+
+
+def plot_elbow_comparativo(
+    resultados_dict: Dict[str, Union[Dict[int, float], pd.DataFrame]],
+    nome_arquivo: Optional[str] = None,
+    save_dir: Optional[Union[str, Path]] = None,
+) -> plt.Figure:
+    """Plota curvas de Elbow lado a lado para múltiplos espaços (ex: PCA 10D vs UMAP 10D)."""
+    n_espacos = len(resultados_dict)
+    fig, axes = plt.subplots(1, n_espacos, figsize=(6.2 * n_espacos, 4.6))
+    if n_espacos == 1:
+        axes = [axes]
+
+    cores = ["#2E86C1", "#C00000", "#28B463", "#8E44AD"]
+    for idx, (titulo, dados) in enumerate(resultados_dict.items()):
+        ax = axes[idx]
+        if isinstance(dados, pd.DataFrame):
+            ks = dados["K"].values
+            inercias = dados["Inercia"].values
+        else:
+            ks = list(dados.keys())
+            inercias = list(dados.values())
+        ax.plot(ks, inercias, marker="o", linewidth=2.2, color=cores[idx % len(cores)])
+        ax.set_title(f"Método do Cotovelo — {titulo}", fontweight="bold", fontsize=11)
+        ax.set_xlabel("Número de Clusters (K)")
+        ax.set_ylabel("Inércia (SSE)")
+        ax.set_xticks(ks)
+        ax.grid(alpha=0.25)
+        sns.despine(ax=ax)
+
+    plt.suptitle("K-Means — Comparação de Curvas Elbow", fontweight="bold", fontsize=13, y=1.03)
+    plt.tight_layout()
+    _salvar_figura_opcional(fig, nome_arquivo=nome_arquivo, save_dir=save_dir)
+    return fig
+
+
+def plot_metricas_validacao(
+    df_metricas: pd.DataFrame,
+    titulo_espaco: str = "",
+    nome_arquivo: Optional[str] = None,
+    save_dir: Optional[Union[str, Path]] = None,
+) -> plt.Figure:
+    """Plota Silhouette (↑), Davies-Bouldin (↓) e Calinski-Harabasz (↑) ao longo de K (adaptado do Projeto-07)."""
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.6))
+    ks = df_metricas["K"].values
+    configs = [
+        ("Silhouette", "Silhouette Score (↑ melhor)", "#2E86C1", True),
+        ("Davies_Bouldin", "Davies-Bouldin (↓ melhor)", "#C00000", False),
+        ("Calinski_Harabasz", "Calinski-Harabasz (↑ melhor)", "#28B463", True),
+    ]
+
+    for ax, (col, titulo, cor, maior_melhor) in zip(axes, configs):
+        vals = df_metricas[col].values
+        ax.plot(ks, vals, marker="o", linewidth=2.0, color=cor)
+        idx_melhor = int(np.argmax(vals) if maior_melhor else np.argmin(vals))
+        k_best = ks[idx_melhor]
+        v_best = vals[idx_melhor]
+        ax.scatter([k_best], [v_best], s=110, color="#F39C12", zorder=5, edgecolor="black", label=f"Melhor K={k_best} ({v_best:.3f})")
+        ax.set_title(titulo, fontweight="bold", fontsize=10.5)
+        ax.set_xlabel("K")
+        ax.set_xticks(ks)
+        ax.grid(alpha=0.25)
+        ax.legend(fontsize=8.5)
+        sns.despine(ax=ax)
+
+    sufixo = f" — {titulo_espaco}" if titulo_espaco else ""
+    plt.suptitle(f"Métricas Internas de Validação (K-Means){sufixo}", fontweight="bold", fontsize=13, y=1.03)
+    plt.tight_layout()
+    _salvar_figura_opcional(fig, nome_arquivo=nome_arquivo, save_dir=save_dir)
+    return fig
+
+
+def plot_k_distance_dbscan(
+    X_espaco: np.ndarray,
+    k: int = 15,
+    titulo_espaco: str = "UMAP 10D",
+    nome_arquivo: Optional[str] = None,
+    save_dir: Optional[Union[str, Path]] = None,
+) -> Tuple[plt.Figure, np.ndarray]:
+    """Calcula e plota o gráfico de k-distância (k-NN) para estimar o `eps` do DBSCAN."""
+    from sklearn.neighbors import NearestNeighbors
+
+    vizinhos = NearestNeighbors(n_neighbors=k)
+    vizinhos.fit(X_espaco)
+    distancias, _ = vizinhos.kneighbors(X_espaco)
+    k_dists = np.sort(distancias[:, k - 1])
+
+    p90, p95, p99 = np.percentile(k_dists, [90, 95, 99])
+    fig, ax = plt.subplots(figsize=(9.5, 4.6))
+    ax.plot(k_dists, linewidth=1.8, color="#2E86C1", label=f"Distância ao {k}º vizinho")
+    ax.axhline(p90, color="#28B463", linestyle="--", linewidth=1.2, label=f"P90 = {p90:.3f}")
+    ax.axhline(p95, color="#F39C12", linestyle="--", linewidth=1.2, label=f"P95 = {p95:.3f}")
+    ax.axhline(p99, color="#C00000", linestyle="--", linewidth=1.2, label=f"P99 = {p99:.3f}")
+
+    ax.set_title(f"Curva k-Distance (k={k}) — Estimativa de eps ({titulo_espaco})", fontweight="bold", fontsize=11.5)
+    ax.set_xlabel("Amostras Ordenadas por Distância")
+    ax.set_ylabel(f"Distância até o {k}º Vizinho")
+    ax.grid(alpha=0.25)
+    ax.legend(loc="upper left")
+    sns.despine(ax=ax)
+    plt.tight_layout()
+    _salvar_figura_opcional(fig, nome_arquivo=nome_arquivo, save_dir=save_dir)
+    return fig, k_dists
+
+
+def avaliar_grade_dbscan(
+    X_tratado: np.ndarray,
+    grade_eps: Iterable[float],
+    grade_min_samples: Iterable[int],
+    sample_size: Optional[int] = 10000,
+    random_state: int = 42,
+) -> pd.DataFrame:
+    """Executa busca em grade para DBSCAN calculando métricas internas estritamente sem o ruído (-1)."""
+    from sklearn.cluster import DBSCAN
+    from sklearn.metrics import calinski_harabasz_score, davies_bouldin_score, silhouette_score
+
+    resultados = []
+    n_amostras = len(X_tratado)
+
+    for eps in grade_eps:
+        for ms in grade_min_samples:
+            modelo = DBSCAN(eps=eps, min_samples=ms)
+            labels = modelo.fit_predict(X_tratado)
+
+            mask = labels != -1
+            n_ruido = int((~mask).sum())
+            pct_ruido = float(n_ruido / n_amostras * 100)
+            clusters_validos = np.unique(labels[mask])
+            n_clusters = int(len(clusters_validos))
+
+            if n_clusters >= 2 and int(mask.sum()) > n_clusters:
+                X_val = X_tratado[mask]
+                y_val = labels[mask]
+                sil_sample = min(sample_size, len(X_val)) if (sample_size is not None and len(X_val) > sample_size) else None
+                sil = float(silhouette_score(X_val, y_val, sample_size=sil_sample, random_state=random_state))
+                db = float(davies_bouldin_score(X_val, y_val))
+                ch = float(calinski_harabasz_score(X_val, y_val))
+            else:
+                sil, db, ch = np.nan, np.nan, np.nan
+
+            resultados.append({
+                "eps": float(eps),
+                "min_samples": int(ms),
+                "N_Clusters": n_clusters,
+                "N_Ruido": n_ruido,
+                "%_Ruido": round(pct_ruido, 2),
+                "Silhouette": sil,
+                "Davies_Bouldin": db,
+                "Calinski_Harabasz": ch,
+            })
+
+    return pd.DataFrame(resultados)
+
+
+def plot_metricas_dbscan(
+    df_res: pd.DataFrame,
+    titulo_espaco: str = "",
+    nome_arquivo: Optional[str] = None,
+    save_dir: Optional[Union[str, Path]] = None,
+) -> plt.Figure:
+    """Plota Silhouette, % de Ruído e N_Clusters na grade do DBSCAN (adaptado do Projeto-07)."""
+    fig, axes = plt.subplots(1, 3, figsize=(16, 4.8))
+    cores = ["#2E86C1", "#C00000", "#28B463", "#8E44AD", "#D35400"]
+
+    for idx, ms in enumerate(sorted(df_res["min_samples"].unique())):
+        sub = df_res[df_res["min_samples"] == ms].sort_values("eps")
+        cor = cores[idx % len(cores)]
+        lbl = f"min_samples={ms}"
+        axes[0].plot(sub["eps"], sub["Silhouette"], marker="o", linewidth=1.8, color=cor, label=lbl)
+        axes[1].plot(sub["eps"], sub["%_Ruido"], marker="s", linewidth=1.8, color=cor, label=lbl)
+        axes[2].plot(sub["eps"], sub["N_Clusters"], marker="^", linewidth=1.8, color=cor, label=lbl)
+
+    axes[0].set_title("Silhouette (sem ruído -1) ↑", fontweight="bold")
+    axes[1].set_title("% Pontos classificados como Ruído (-1)", fontweight="bold")
+    axes[2].set_title("Número de Clusters Descobertos", fontweight="bold")
+    for ax in axes:
+        ax.set_xlabel("eps")
+        ax.grid(alpha=0.25)
+        ax.legend(fontsize=8.5)
+        sns.despine(ax=ax)
+
+    sufixo = f" — {titulo_espaco}" if titulo_espaco else ""
+    plt.suptitle(f"Sensibilidade DBSCAN{sufixo}", fontweight="bold", fontsize=13, y=1.03)
+    plt.tight_layout()
+    _salvar_figura_opcional(fig, nome_arquivo=nome_arquivo, save_dir=save_dir)
+    return fig
+
+
+def avaliar_grade_hdbscan(
+    X_tratado: np.ndarray,
+    grade_min_cluster_size: Iterable[int] = (100, 150, 250, 400),
+    grade_min_samples: Iterable[int] = (15, 30),
+    gen_min_span_tree: bool = True,
+    prediction_data: bool = False,
+    sample_size: Optional[int] = 10000,
+    random_state: int = 42,
+) -> pd.DataFrame:
+    """Executa grade do HDBSCAN extraindo DBCV (`relative_validity_`) e métricas sem ruído (-1)."""
+    try:
+        import hdbscan
+    except ImportError as exc:
+        raise ImportError("Pacote 'hdbscan' não encontrado. Instale com `pip install hdbscan`.") from exc
+
+    from sklearn.metrics import calinski_harabasz_score, davies_bouldin_score, silhouette_score
+
+    resultados = []
+    n_amostras = len(X_tratado)
+
+    for mcs in grade_min_cluster_size:
+        for ms in grade_min_samples:
+            modelo = hdbscan.HDBSCAN(
+                min_cluster_size=int(mcs),
+                min_samples=int(ms),
+                gen_min_span_tree=gen_min_span_tree,
+                prediction_data=prediction_data,
+            )
+            labels = modelo.fit_predict(X_tratado)
+
+            mask = labels != -1
+            n_ruido = int((~mask).sum())
+            pct_ruido = float(n_ruido / n_amostras * 100)
+            clusters_validos = np.unique(labels[mask])
+            n_clusters = int(len(clusters_validos))
+            dbcv = float(getattr(modelo, "relative_validity_", np.nan)) if gen_min_span_tree else np.nan
+
+            if n_clusters >= 2 and int(mask.sum()) > n_clusters:
+                X_val = X_tratado[mask]
+                y_val = labels[mask]
+                sil_sample = min(sample_size, len(X_val)) if (sample_size is not None and len(X_val) > sample_size) else None
+                sil = float(silhouette_score(X_val, y_val, sample_size=sil_sample, random_state=random_state))
+                db = float(davies_bouldin_score(X_val, y_val))
+                ch = float(calinski_harabasz_score(X_val, y_val))
+            else:
+                sil, db, ch = np.nan, np.nan, np.nan
+
+            resultados.append({
+                "min_cluster_size": int(mcs),
+                "min_samples": int(ms),
+                "N_Clusters": n_clusters,
+                "N_Ruido": n_ruido,
+                "%_Ruido": round(pct_ruido, 2),
+                "DBCV": round(dbcv, 4) if not np.isnan(dbcv) else np.nan,
+                "Silhouette": sil,
+                "Davies_Bouldin": db,
+                "Calinski_Harabasz": ch,
+            })
+
+    return pd.DataFrame(resultados)
+
+
+def plot_metricas_hdbscan(
+    df_res: pd.DataFrame,
+    titulo_espaco: str = "",
+    nome_arquivo: Optional[str] = None,
+    save_dir: Optional[Union[str, Path]] = None,
+) -> plt.Figure:
+    """Plota DBCV, Silhouette, % Ruído e N_Clusters na grade do HDBSCAN (adaptado do Projeto-07)."""
+    fig, axes = plt.subplots(1, 4, figsize=(18, 4.6))
+    cores = ["#2E86C1", "#C00000", "#28B463", "#8E44AD"]
+
+    for idx, ms in enumerate(sorted(df_res["min_samples"].unique())):
+        sub = df_res[df_res["min_samples"] == ms].sort_values("min_cluster_size")
+        cor = cores[idx % len(cores)]
+        lbl = f"min_samples={ms}"
+        axes[0].plot(sub["min_cluster_size"], sub["DBCV"], marker="o", linewidth=1.8, color=cor, label=lbl)
+        axes[1].plot(sub["min_cluster_size"], sub["Silhouette"], marker="o", linewidth=1.8, color=cor, label=lbl)
+        axes[2].plot(sub["min_cluster_size"], sub["%_Ruido"], marker="s", linewidth=1.8, color=cor, label=lbl)
+        axes[3].plot(sub["min_cluster_size"], sub["N_Clusters"], marker="^", linewidth=1.8, color=cor, label=lbl)
+
+    axes[0].set_title("DBCV (relative_validity_) ↑", fontweight="bold")
+    axes[1].set_title("Silhouette (sem ruído -1) ↑", fontweight="bold")
+    axes[2].set_title("% Ruído (-1) ↓", fontweight="bold")
+    axes[3].set_title("Nº de Clusters", fontweight="bold")
+    for ax in axes:
+        ax.set_xlabel("min_cluster_size")
+        ax.grid(alpha=0.25)
+        ax.legend(fontsize=8)
+        sns.despine(ax=ax)
+
+    sufixo = f" — {titulo_espaco}" if titulo_espaco else ""
+    plt.suptitle(f"Sensibilidade HDBSCAN{sufixo}", fontweight="bold", fontsize=13, y=1.03)
+    plt.tight_layout()
+    _salvar_figura_opcional(fig, nome_arquivo=nome_arquivo, save_dir=save_dir)
+    return fig
+
+
+def avaliar_rotulos_clusterizacao(
+    labels: np.ndarray,
+    X_espaco: np.ndarray,
+    nome_modelo: str,
+    nome_espaco: str,
+    dbcv: float = np.nan,
+    sample_size: Optional[int] = 10000,
+    random_state: int = 42,
+) -> Dict[str, Any]:
+    """Avalia um vetor de rótulos filtrando estritamente ruído (-1) para a tabela comparativa."""
+    from sklearn.metrics import calinski_harabasz_score, davies_bouldin_score, silhouette_score
+
+    labels_arr = np.asarray(labels)
+    mask = labels_arr != -1
+    n_total = len(labels_arr)
+    n_ruido = int((~mask).sum())
+    pct_ruido = round(float(n_ruido / n_total * 100), 2)
+    n_clusters = int(len(np.unique(labels_arr[mask])))
+
+    if n_clusters >= 2 and int(mask.sum()) > n_clusters:
+        X_val = X_espaco[mask]
+        y_val = labels_arr[mask]
+        sil_sample = min(sample_size, len(X_val)) if (sample_size is not None and len(X_val) > sample_size) else None
+        sil = round(float(silhouette_score(X_val, y_val, sample_size=sil_sample, random_state=random_state)), 4)
+        db = round(float(davies_bouldin_score(X_val, y_val)), 4)
+        ch = round(float(calinski_harabasz_score(X_val, y_val)), 2)
+    else:
+        sil, db, ch = np.nan, np.nan, np.nan
+
+    return {
+        "Algoritmo": nome_modelo,
+        "Espaco": nome_espaco,
+        "N_Clusters": n_clusters,
+        "%_Ruido": pct_ruido,
+        "Silhouette": sil,
+        "Davies_Bouldin": db,
+        "Calinski_Harabasz": ch,
+        "DBCV": round(float(dbcv), 4) if not np.isnan(dbcv) else np.nan,
+    }
+
+
+def plot_distribuicao_clusters(
+    labels: Union[np.ndarray, pd.Series],
+    titulo: str = "Distribuição de Fraudes por Cluster",
+    nome_arquivo: Optional[str] = None,
+    save_dir: Optional[Union[str, Path]] = None,
+) -> plt.Figure:
+    """Plota volume absoluto e % por cluster, destacando ruído (-1) em cinza (adaptado do Projeto-07)."""
+    contagem = pd.Series(labels).value_counts().sort_index()
+    total = contagem.sum()
+
+    fig, ax = plt.subplots(figsize=(max(7.5, len(contagem) * 0.9), 4.6))
+    cores = ["#95A5A6" if idx == -1 else "#2E86C1" for idx in contagem.index]
+    nomes = ["Ruído (-1)" if idx == -1 else f"Cluster {idx}" for idx in contagem.index]
+
+    bars = ax.bar(nomes, contagem.values, color=cores, edgecolor="black", alpha=0.88)
+    for bar, val in zip(bars, contagem.values):
+        pct = val / total * 100
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + total * 0.01,
+            f"{val:,}\n({pct:.1f}%)",
+            ha="center",
+            va="bottom",
+            fontsize=8.8,
+            fontweight="bold",
+        )
+
+    ax.set_title(titulo, fontweight="bold", fontsize=12)
+    ax.set_ylabel("Número de Transações Fraudulentas")
+    ax.set_ylim(0, contagem.max() * 1.18)
+    ax.grid(axis="y", alpha=0.25)
+    plt.xticks(rotation=20 if len(nomes) > 6 else 0)
+    sns.despine(ax=ax)
+    plt.tight_layout()
+    _salvar_figura_opcional(fig, nome_arquivo=nome_arquivo, save_dir=save_dir)
+    return fig
+
+
+def plot_clusters_2d_plotly(
+    X_2d: np.ndarray,
+    labels: Union[np.ndarray, pd.Series],
+    titulo: str = "Projeção UMAP 2D das Fraudes por Cluster",
+    hover_df: Optional[pd.DataFrame] = None,
+    sample_plot: Optional[int] = 15000,
+    random_state: int = 42,
+    nome_arquivo: Optional[str] = None,
+    save_dir: Optional[Union[str, Path]] = None,
+) -> Any:
+    """Gera scatter interativo Plotly em 2D colorindo por cluster e destacando ruído (-1) (adaptado do Projeto-07)."""
+    try:
+        import plotly.express as px
+    except ImportError as exc:
+        raise ImportError("Pacote 'plotly' não encontrado. Instale com `pip install plotly`.") from exc
+
+    df_plot = pd.DataFrame({
+        "Dim_1": X_2d[:, 0],
+        "Dim_2": X_2d[:, 1],
+        "Cluster": ["Ruído (-1)" if lbl == -1 else f"Cluster {lbl}" for lbl in labels],
+    })
+
+    hover_cols: List[str] = []
+    if hover_df is not None:
+        for col in ["TransactionAmt", "ProductCD", "card4", "device_brand", "P_emaildomain"]:
+            if col in hover_df.columns:
+                vals = hover_df[col].reset_index(drop=True)
+                if col == "TransactionAmt" and pd.api.types.is_numeric_dtype(vals) and vals.dropna().max() <= 20:
+                    df_plot["Ticket_USD"] = np.round(np.expm1(vals), 2)
+                    hover_cols.append("Ticket_USD")
+                else:
+                    df_plot[col] = vals
+                    hover_cols.append(col)
+
+    if sample_plot is not None and len(df_plot) > sample_plot:
+        df_plot = df_plot.sample(n=sample_plot, random_state=random_state)
+
+    ordem_clusters = sorted(df_plot["Cluster"].unique(), key=lambda s: (s != "Ruído (-1)", s))
+    color_map = {"Ruído (-1)": "#B0B0B0"}
+
+    fig = px.scatter(
+        df_plot,
+        x="Dim_1",
+        y="Dim_2",
+        color="Cluster",
+        category_orders={"Cluster": ordem_clusters},
+        color_discrete_map=color_map,
+        hover_data=hover_cols if hover_cols else None,
+        title=titulo,
+        opacity=0.68,
+        template="plotly_white",
+    )
+    fig.update_traces(marker=dict(size=4.5))
+    fig.update_layout(height=580, legend_title_text="Cluster")
+    _salvar_figura_opcional(fig, nome_arquivo=nome_arquivo, save_dir=save_dir)
+    return fig
+
+
+def gerar_perfil_fraude_clusters(
+    df_fraude: pd.DataFrame,
+    col_cluster: str = "cluster_campeao",
+    ignorar_ruido: bool = False,
+) -> pd.DataFrame:
+    """Gera tabela de perfilamento de negócio por cluster (Etapa 6): financeiro, infraestrutura e comportamento."""
+    df = df_fraude.copy()
+    if ignorar_ruido:
+        df = df[df[col_cluster] != -1].copy()
+
+    total_fraudes = len(df)
+    amt_em_log = False
+    if "TransactionAmt" in df.columns and pd.api.types.is_numeric_dtype(df["TransactionAmt"]):
+        amt_valid = df["TransactionAmt"].dropna()
+        if not amt_valid.empty and amt_valid.min() >= 0 and amt_valid.max() <= 20.0:
+            amt_em_log = True
+            df["_amt_usd"] = np.expm1(df["TransactionAmt"].astype("float64"))
+        else:
+            df["_amt_usd"] = df["TransactionAmt"].astype("float64")
+
+    cols_moda = [c for c in ["ProductCD", "card4", "card6_limpo", "device_brand", "P_emaildomain"] if c in df.columns]
+    cols_nulos = [c for c in ["tr_null_count", "id_null_count"] if c in df.columns]
+    cols_c = [f"C{i}" for i in range(1, 15) if f"C{i}" in df.columns][:5]
+
+    linhas = []
+    for cid, grupo in df.groupby(col_cluster, sort=True):
+        n_grupo = len(grupo)
+        registro: Dict[str, Any] = {
+            "Cluster": "Ruído (-1)" if cid == -1 else f"Cluster {cid}",
+            "N_Fraudes": n_grupo,
+            "%_Fraudes": round(n_grupo / total_fraudes * 100, 2),
+        }
+
+        if "_amt_usd" in grupo.columns:
+            registro["Prejuizo_Total_USD"] = round(float(grupo["_amt_usd"].sum()), 2)
+            registro["Ticket_Medio_USD"] = round(float(grupo["_amt_usd"].mean()), 2)
+            registro["Ticket_Mediano_USD"] = round(float(grupo["_amt_usd"].median()), 2)
+
+        for col in cols_moda:
+            serie_str = grupo[col].astype("object").fillna("missing").astype(str)
+            vc = serie_str.value_counts(normalize=True)
+            if not vc.empty:
+                registro[f"{col}_Moda"] = f"{vc.index[0]} ({vc.iloc[0]*100:.1f}%)"
+
+        for col in cols_nulos + cols_c:
+            serie_num = grupo[col].astype("float64")
+            if col in cols_c and not serie_num.dropna().empty and serie_num.dropna().min() >= 0 and serie_num.dropna().max() <= 15.0:
+                # Mantém legibilidade em contagens reais caso a coluna C tenha vindo em log1p do EDA
+                serie_num = np.expm1(serie_num)
+            registro[f"Media_{col}"] = round(float(serie_num.mean()), 2)
+
+        linhas.append(registro)
+
+    if amt_em_log:
+        print("Nota: `TransactionAmt` estava em escala `log1p`; valores USD foram reconvertidos via `expm1`.")
+    return pd.DataFrame(linhas).sort_values("N_Fraudes", ascending=False).reset_index(drop=True)
+
+
+def plot_violino_perfil_clusters(
+    df_fraude: pd.DataFrame,
+    col_cluster: str = "cluster_campeao",
+    cols_numericas: Optional[List[str]] = None,
+    ignorar_ruido: bool = True,
+    nome_arquivo: Optional[str] = None,
+    save_dir: Optional[Union[str, Path]] = None,
+) -> plt.Figure:
+    """Plota distribuição (boxplot/violino) das principais variáveis por cluster (adaptado do Projeto-07)."""
+    df = df_fraude.copy()
+    if ignorar_ruido:
+        df = df[df[col_cluster] != -1].copy()
+
+    if cols_numericas is None:
+        candidatas = ["TransactionAmt", "tr_null_count", "id_null_count", "C1", "C14", "TransactionAmt_to_mean_card1"]
+        cols_numericas = [c for c in candidatas if c in df.columns][:4]
+
+    n_cols = len(cols_numericas)
+    if n_cols == 0:
+        raise ValueError("Nenhuma variável numérica válida encontrada para o gráfico de perfil.")
+
+    df["_cluster_label"] = df[col_cluster].apply(lambda x: "Ruído (-1)" if x == -1 else f"C{x}")
+    ordem = sorted(df["_cluster_label"].unique(), key=lambda s: (s == "Ruído (-1)", s))
+
+    fig, axes = plt.subplots(1, n_cols, figsize=(4.8 * n_cols, 4.6))
+    if n_cols == 1:
+        axes = [axes]
+
+    for ax, col in zip(axes, cols_numericas):
+        sns.boxplot(data=df, x="_cluster_label", y=col, order=ordem, hue="_cluster_label", legend=False, palette="Set2", showfliers=False, ax=ax)
+        ax.set_title(col, fontweight="bold", fontsize=11)
+        ax.set_xlabel("Cluster")
+        ax.grid(axis="y", alpha=0.25)
+        plt.setp(ax.get_xticklabels(), rotation=20)
+        sns.despine(ax=ax)
+
+    plt.suptitle("Assinatura Comportamental dos Clusters (Distribuição Sem Outliers Extremos)", fontweight="bold", fontsize=13, y=1.03)
+    plt.tight_layout()
+    _salvar_figura_opcional(fig, nome_arquivo=nome_arquivo, save_dir=save_dir)
+    return fig
+
+
+def _avaliar_metricas_sem_ruido(
+    labels: np.ndarray,
+    X_espaco: np.ndarray,
+    sample_size: Optional[int] = 10000,
+    random_state: int = 42,
+) -> Dict[str, Any]:
+    """Calcula N_Clusters, %_Ruido e métricas internas filtrando estritamente `labels != -1`.
+
+    Quando `len(X_val) > sample_size` (ex: 10.000), usa subsample estratificado aleatório
+    apenas no cálculo do Silhouette Score para manter custo O(n^2) viável.
+    """
+    from sklearn.metrics import calinski_harabasz_score, davies_bouldin_score, silhouette_score
+
+    labels_arr = np.asarray(labels)
+    mask = labels_arr != -1
+    n_total = len(labels_arr)
+    n_ruido = int((~mask).sum())
+    pct_ruido = float(n_ruido / n_total * 100)
+    n_clusters = int(len(np.unique(labels_arr[mask])))
+
+    if n_clusters >= 2 and int(mask.sum()) > n_clusters:
+        X_val = X_espaco[mask]
+        y_val = labels_arr[mask]
+        # Subsample de 10k (padrão) no Silhouette para evitar explosão O(n^2)
+        sil_sample = min(sample_size, len(X_val)) if (sample_size is not None and len(X_val) > sample_size) else None
+        sil = float(silhouette_score(X_val, y_val, sample_size=sil_sample, random_state=random_state))
+        db = float(davies_bouldin_score(X_val, y_val))
+        ch = float(calinski_harabasz_score(X_val, y_val))
+    else:
+        sil, db, ch = np.nan, np.nan, np.nan
+
+    return {
+        "n_clusters": n_clusters,
+        "n_ruido": n_ruido,
+        "pct_ruido": round(pct_ruido, 2),
+        "silhouette": sil,
+        "davies_bouldin": db,
+        "calinski_harabasz": ch,
+    }
+
+
+def _obter_umap_cache(
+    cache_umap: Dict[Tuple[int, float], np.ndarray],
+    X_tratado: np.ndarray,
+    n_neighbors: int,
+    min_dist: float,
+    n_components: int = 10,
+    random_state: int = 42,
+) -> np.ndarray:
+    """Retorna projeção UMAP em cache para `(n_neighbors, min_dist)` evitando recálculos repetidos no Optuna."""
+    import umap
+
+    chave = (int(n_neighbors), round(float(min_dist), 3))
+    if chave not in cache_umap:
+        modelo = umap.UMAP(
+            n_components=n_components,
+            n_neighbors=chave[0],
+            min_dist=chave[1],
+            metric="euclidean",
+            random_state=random_state,
+        )
+        cache_umap[chave] = modelo.fit_transform(X_tratado)
+    return cache_umap[chave]
+
+
+def otimizar_dbscan_optuna(
+    X_espaco_fixo: Optional[np.ndarray] = None,
+    X_tratado_umap: Optional[np.ndarray] = None,
+    otimizar_umap: bool = False,
+    n_trials: int = 25,
+    max_ruido_pct: float = 45.0,
+    sample_size: Optional[int] = 10000,
+    random_state: int = 42,
+    eps_range: Optional[Tuple[float, float]] = None,
+    umap_neighbors_opcoes: Tuple[int, ...] = (25, 35, 45, 55),
+    umap_min_dist_opcoes: Tuple[float, ...] = (0.0, 0.05, 0.1),
+) -> Tuple[Dict[str, Any], np.ndarray, np.ndarray, pd.DataFrame, Any]:
+    """Otimiza DBSCAN via Optuna maximizando Silhouette (sem ruído -1, subsample=10k) com trava de ruído.
+
+    Quando `otimizar_umap=True`, otimiza conjuntamente `n_neighbors` e `min_dist` do UMAP 10D
+    (com cache de projeções e `eps` guiado por quantis da 15-NN k-distance do espaço corrente).
+    """
+    import optuna
+    from sklearn.cluster import DBSCAN
+    from sklearn.neighbors import NearestNeighbors
+
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
+    if otimizar_umap and X_tratado_umap is None:
+        raise ValueError("Forneça `X_tratado_umap` quando `otimizar_umap=True`.")
+    if not otimizar_umap and X_espaco_fixo is None:
+        raise ValueError("Forneça `X_espaco_fixo` quando `otimizar_umap=False`.")
+
+    cache_umap: Dict[Tuple[int, float], np.ndarray] = {}
+    cache_kdists: Dict[Tuple[int, float], np.ndarray] = {}
+
+    if not otimizar_umap and eps_range is None:
+        viz = NearestNeighbors(n_neighbors=15).fit(X_espaco_fixo)
+        dists, _ = viz.kneighbors(X_espaco_fixo)
+        k_dists = np.sort(dists[:, 14])
+        eps_range = (float(np.percentile(k_dists, 50)), float(np.percentile(k_dists, 98)))
+
+    def objective(trial: optuna.Trial) -> float:
+        if otimizar_umap:
+            nn = trial.suggest_categorical("umap_n_neighbors", list(umap_neighbors_opcoes))
+            md = trial.suggest_categorical("umap_min_dist", list(umap_min_dist_opcoes))
+            chave = (int(nn), round(float(md), 3))
+            X_cur = _obter_umap_cache(cache_umap, X_tratado_umap, nn, md, n_components=10, random_state=random_state)
+            if chave not in cache_kdists:
+                dists, _ = NearestNeighbors(n_neighbors=15).fit(X_cur).kneighbors(X_cur)
+                cache_kdists[chave] = np.sort(dists[:, 14])
+            eps_q = trial.suggest_float("eps_quantil", 0.55, 0.97)
+            eps = float(np.quantile(cache_kdists[chave], eps_q))
+        else:
+            X_cur = X_espaco_fixo
+            eps = trial.suggest_float("eps", eps_range[0], eps_range[1])
+
+        ms = trial.suggest_int("min_samples", 10, 35, step=5)
+        labels = DBSCAN(eps=eps, min_samples=ms).fit_predict(X_cur)
+        m = _avaliar_metricas_sem_ruido(labels, X_cur, sample_size=sample_size, random_state=random_state)
+
+        trial.set_user_attr("eps_real", round(eps, 4))
+        trial.set_user_attr("N_Clusters", m["n_clusters"])
+        trial.set_user_attr("%_Ruido", m["pct_ruido"])
+        trial.set_user_attr("Silhouette", m["silhouette"])
+        trial.set_user_attr("Davies_Bouldin", m["davies_bouldin"])
+        trial.set_user_attr("Calinski_Harabasz", m["calinski_harabasz"])
+
+        if m["n_clusters"] < 2 or m["pct_ruido"] > max_ruido_pct or np.isnan(m["silhouette"]):
+            return -1.0
+        return m["silhouette"]
+
+    study = optuna.create_study(direction="maximize", sampler=optuna.samplers.TPESampler(seed=random_state))
+    study.optimize(objective, n_trials=n_trials, show_progress_bar=False)
+
+    registros = []
+    for t in study.trials:
+        reg = {"trial": t.number, "objetivo": t.value, **t.params, **t.user_attrs}
+        registros.append(reg)
+    df_trials = pd.DataFrame(registros)
+
+    best = study.best_trial
+    best_params = dict(best.params)
+    best_params["eps_real"] = best.user_attrs.get("eps_real", best_params.get("eps"))
+
+    if otimizar_umap:
+        X_best = _obter_umap_cache(
+            cache_umap,
+            X_tratado_umap,
+            best_params["umap_n_neighbors"],
+            best_params["umap_min_dist"],
+            n_components=10,
+            random_state=random_state,
+        )
+    else:
+        X_best = X_espaco_fixo
+
+    best_labels = DBSCAN(eps=float(best_params["eps_real"]), min_samples=int(best_params["min_samples"])).fit_predict(X_best)
+    return best_params, best_labels, X_best, df_trials, study
+
+
+def otimizar_hdbscan_optuna(
+    X_espaco_fixo: Optional[np.ndarray] = None,
+    X_tratado_umap: Optional[np.ndarray] = None,
+    otimizar_umap: bool = False,
+    n_trials: int = 25,
+    max_ruido_pct: float = 45.0,
+    sample_size: Optional[int] = 10000,
+    random_state: int = 42,
+    umap_neighbors_opcoes: Tuple[int, ...] = (25, 35, 45, 55),
+    umap_min_dist_opcoes: Tuple[float, ...] = (0.0, 0.05, 0.1),
+) -> Tuple[Dict[str, Any], np.ndarray, np.ndarray, float, pd.DataFrame, Any]:
+    """Otimiza HDBSCAN via Optuna maximizando DBCV (`relative_validity_`) com trava de viabilidade.
+
+    Calcula Silhouette em subsample de `sample_size` (padrão 10k) estritamente sobre `labels != -1`.
+    Quando `otimizar_umap=True`, otimiza conjuntamente `n_neighbors` e `min_dist` do UMAP 10D.
+    """
+    import hdbscan
+    import optuna
+
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
+    if otimizar_umap and X_tratado_umap is None:
+        raise ValueError("Forneça `X_tratado_umap` quando `otimizar_umap=True`.")
+    if not otimizar_umap and X_espaco_fixo is None:
+        raise ValueError("Forneça `X_espaco_fixo` quando `otimizar_umap=False`.")
+
+    cache_umap: Dict[Tuple[int, float], np.ndarray] = {}
+
+    def objective(trial: optuna.Trial) -> float:
+        if otimizar_umap:
+            nn = trial.suggest_categorical("umap_n_neighbors", list(umap_neighbors_opcoes))
+            md = trial.suggest_categorical("umap_min_dist", list(umap_min_dist_opcoes))
+            X_cur = _obter_umap_cache(cache_umap, X_tratado_umap, nn, md, n_components=10, random_state=random_state)
+        else:
+            X_cur = X_espaco_fixo
+
+        mcs = trial.suggest_int("min_cluster_size", 100, 400, step=25)
+        ms = trial.suggest_int("min_samples", 10, 40, step=5)
+        sel_method = trial.suggest_categorical("cluster_selection_method", ["eom", "leaf"])
+
+        modelo = hdbscan.HDBSCAN(
+            min_cluster_size=mcs,
+            min_samples=ms,
+            cluster_selection_method=sel_method,
+            gen_min_span_tree=True,
+        )
+        labels = modelo.fit_predict(X_cur)
+        dbcv = float(getattr(modelo, "relative_validity_", np.nan))
+        m = _avaliar_metricas_sem_ruido(labels, X_cur, sample_size=sample_size, random_state=random_state)
+
+        trial.set_user_attr("N_Clusters", m["n_clusters"])
+        trial.set_user_attr("%_Ruido", m["pct_ruido"])
+        trial.set_user_attr("DBCV", round(dbcv, 4) if not np.isnan(dbcv) else np.nan)
+        trial.set_user_attr("Silhouette", m["silhouette"])
+        trial.set_user_attr("Davies_Bouldin", m["davies_bouldin"])
+        trial.set_user_attr("Calinski_Harabasz", m["calinski_harabasz"])
+
+        if m["n_clusters"] < 2 or m["pct_ruido"] > max_ruido_pct or np.isnan(dbcv):
+            return -1.0
+        return dbcv
+
+    study = optuna.create_study(direction="maximize", sampler=optuna.samplers.TPESampler(seed=random_state))
+    study.optimize(objective, n_trials=n_trials, show_progress_bar=False)
+
+    registros = []
+    for t in study.trials:
+        reg = {"trial": t.number, "objetivo": t.value, **t.params, **t.user_attrs}
+        registros.append(reg)
+    df_trials = pd.DataFrame(registros)
+
+    best_params = dict(study.best_trial.params)
+    if otimizar_umap:
+        X_best = _obter_umap_cache(
+            cache_umap,
+            X_tratado_umap,
+            best_params["umap_n_neighbors"],
+            best_params["umap_min_dist"],
+            n_components=10,
+            random_state=random_state,
+        )
+    else:
+        X_best = X_espaco_fixo
+
+    modelo_best = hdbscan.HDBSCAN(
+        min_cluster_size=int(best_params["min_cluster_size"]),
+        min_samples=int(best_params["min_samples"]),
+        cluster_selection_method=best_params["cluster_selection_method"],
+        gen_min_span_tree=True,
+    )
+    best_labels = modelo_best.fit_predict(X_best)
+    best_dbcv = float(getattr(modelo_best, "relative_validity_", np.nan))
+    return best_params, best_labels, X_best, best_dbcv, df_trials, study
+
+
+def plot_optuna_clusterizacao(
+    df_trials: pd.DataFrame,
+    metrica_alvo: str = "DBCV",
+    titulo: str = "Histórico de Otimização Optuna",
+    nome_arquivo: Optional[str] = None,
+    save_dir: Optional[Union[str, Path]] = None,
+) -> plt.Figure:
+    """Plota evolução da métrica-alvo nos trials válidos e trade-off entre % de ruído e qualidade."""
+    validos = df_trials[df_trials["objetivo"] > -1.0].copy()
+    fig, axes = plt.subplots(1, 2, figsize=(13.5, 4.5))
+
+    if not validos.empty:
+        axes[0].plot(validos["trial"], validos["objetivo"], marker="o", linestyle="-", alpha=0.75, color="#2E86C1", label="Trial válido")
+        axes[0].plot(validos["trial"], validos["objetivo"].cummax(), linestyle="--", linewidth=2.0, color="#C00000", label="Melhor acumulado")
+        sc = axes[1].scatter(validos["%_Ruido"], validos["objetivo"], c=validos["N_Clusters"], cmap="viridis", s=65, edgecolor="black", alpha=0.85)
+        plt.colorbar(sc, ax=axes[1], label="Nº de Clusters")
+    else:
+        axes[0].text(0.5, 0.5, "Nenhum trial viável encontrado", ha="center", va="center", transform=axes[0].transAxes)
+        axes[1].text(0.5, 0.5, "Nenhum trial viável encontrado", ha="center", va="center", transform=axes[1].transAxes)
+
+    axes[0].set_title(f"Evolução Optuna — {metrica_alvo} ↑", fontweight="bold")
+    axes[0].set_xlabel("Trial")
+    axes[0].set_ylabel(metrica_alvo)
+    axes[0].grid(alpha=0.25)
+    axes[0].legend(fontsize=8.5)
+
+    axes[1].set_title(f"Trade-off % Ruído vs {metrica_alvo}", fontweight="bold")
+    axes[1].set_xlabel("% Ruído (-1)")
+    axes[1].set_ylabel(metrica_alvo)
+    axes[1].grid(alpha=0.25)
+
+    for ax in axes:
+        sns.despine(ax=ax)
+
+    plt.suptitle(titulo, fontweight="bold", fontsize=12.5, y=1.03)
+    plt.tight_layout()
+    _salvar_figura_opcional(fig, nome_arquivo=nome_arquivo, save_dir=save_dir)
+    return fig
+
+
+def consolidar_comparacao_clusterizacao(
+    df_km_pca: pd.DataFrame,
+    df_km_umap: pd.DataFrame,
+    X_pca_10d: np.ndarray,
+    X_umap_10d: np.ndarray,
+    db_pca_res: Tuple[Dict[str, Any], np.ndarray, np.ndarray],
+    db_umap_res: Tuple[Dict[str, Any], np.ndarray, np.ndarray],
+    hdb_pca_res: Tuple[Dict[str, Any], np.ndarray, np.ndarray, float],
+    hdb_umap_res: Tuple[Dict[str, Any], np.ndarray, np.ndarray, float],
+    sample_size: Optional[int] = 10000,
+    random_state: int = 42,
+) -> Tuple[pd.DataFrame, Dict[str, np.ndarray]]:
+    """Consolida K-Means (PCA/UMAP) e campeões Optuna de DBSCAN/HDBSCAN em tabela única.
+
+    Usa subsample de `sample_size` (padrão 10.000) no Silhouette Score e filtra ruído (-1).
+    """
+    from sklearn.cluster import KMeans
+
+    candidatos_labels: Dict[str, np.ndarray] = {}
+    registros: List[Dict[str, Any]] = []
+
+    best_km_pca = df_km_pca.sort_values("Silhouette", ascending=False).iloc[0]
+    lbl_km_pca = KMeans(n_clusters=int(best_km_pca["K"]), init="k-means++", n_init=10, random_state=random_state).fit_predict(X_pca_10d)
+    candidatos_labels["KMeans_PCA"] = lbl_km_pca
+    registros.append(avaliar_rotulos_clusterizacao(lbl_km_pca, X_pca_10d, f"K-Means (K={int(best_km_pca['K'])})", "PCA 10D", sample_size=sample_size, random_state=random_state))
+
+    best_km_umap = df_km_umap.sort_values("Silhouette", ascending=False).iloc[0]
+    lbl_km_umap = KMeans(n_clusters=int(best_km_umap["K"]), init="k-means++", n_init=10, random_state=random_state).fit_predict(X_umap_10d)
+    candidatos_labels["KMeans_UMAP"] = lbl_km_umap
+    registros.append(avaliar_rotulos_clusterizacao(lbl_km_umap, X_umap_10d, f"K-Means (K={int(best_km_umap['K'])})", "UMAP 10D", sample_size=sample_size, random_state=random_state))
+
+    db_pca_p, db_pca_lbl, db_pca_X = db_pca_res
+    candidatos_labels["DBSCAN_PCA"] = db_pca_lbl
+    registros.append(avaliar_rotulos_clusterizacao(db_pca_lbl, db_pca_X, f"DBSCAN Optuna (eps={db_pca_p['eps_real']}, ms={db_pca_p['min_samples']})", "PCA 10D", sample_size=sample_size, random_state=random_state))
+
+    db_umap_p, db_umap_lbl, db_umap_X = db_umap_res
+    candidatos_labels["DBSCAN_UMAP"] = db_umap_lbl
+    registros.append(avaliar_rotulos_clusterizacao(db_umap_lbl, db_umap_X, f"DBSCAN+UMAP Optuna (nn={db_umap_p['umap_n_neighbors']}, md={db_umap_p['umap_min_dist']}, eps={db_umap_p['eps_real']})", "UMAP 10D (Optuna)", sample_size=sample_size, random_state=random_state))
+
+    hdb_pca_p, hdb_pca_lbl, hdb_pca_X, hdb_pca_dbcv = hdb_pca_res
+    candidatos_labels["HDBSCAN_PCA"] = hdb_pca_lbl
+    registros.append(avaliar_rotulos_clusterizacao(hdb_pca_lbl, hdb_pca_X, f"HDBSCAN Optuna (mcs={hdb_pca_p['min_cluster_size']}, ms={hdb_pca_p['min_samples']}, {hdb_pca_p['cluster_selection_method']})", "PCA 10D", dbcv=hdb_pca_dbcv, sample_size=sample_size, random_state=random_state))
+
+    hdb_umap_p, hdb_umap_lbl, hdb_umap_X, hdb_umap_dbcv = hdb_umap_res
+    candidatos_labels["HDBSCAN_UMAP"] = hdb_umap_lbl
+    registros.append(avaliar_rotulos_clusterizacao(hdb_umap_lbl, hdb_umap_X, f"HDBSCAN+UMAP Optuna (nn={hdb_umap_p['umap_n_neighbors']}, md={hdb_umap_p['umap_min_dist']}, mcs={hdb_umap_p['min_cluster_size']})", "UMAP 10D (Optuna)", dbcv=hdb_umap_dbcv, sample_size=sample_size, random_state=random_state))
+
+    return pd.DataFrame(registros), candidatos_labels
+
+
+def plot_heatmap_zscore_clusters(
+    df_fraude: pd.DataFrame,
+    col_cluster: str = "cluster",
+    features_continuas: Optional[List[str]] = None,
+    titulo: str = "Assinatura Numérica dos Clusters de Fraude (Modus Operandi)",
+    ignorar_ruido: bool = True,
+    nome_arquivo: Optional[str] = None,
+    save_dir: Optional[Union[str, Path]] = None,
+) -> plt.Figure:
+    """Plota heatmap de Z-Score das médias contínuas por cluster (ancora D* e reconverte log1p se necessário)."""
+    from matplotlib.colors import LinearSegmentedColormap
+
+    df_work = df_fraude.copy()
+    if ignorar_ruido:
+        df_work = df_work[df_work[col_cluster] != -1].copy()
+
+    # Garante D*_ancora temporária se ainda existirem D* brutos + TransactionDT
+    if "TransactionDT" in df_work.columns:
+        dias_dt = df_work["TransactionDT"].astype("float64") / 86400.0
+        for col_d in ["D1", "D2", "D4", "D10", "D15"]:
+            col_anc = f"{col_d}_ancora"
+            if col_anc not in df_work.columns and col_d in df_work.columns and pd.api.types.is_numeric_dtype(df_work[col_d]):
+                s_d = df_work[col_d].astype("float64")
+                v = s_d.dropna()
+                if not v.empty and v.min() >= 0 and v.max() <= 10.0:
+                    s_d = np.expm1(s_d)
+                df_work[col_anc] = s_d - dias_dt
+
+    # Reverte log1p de TransactionAmt apenas na cópia se vier em escala log
+    if "TransactionAmt" in df_work.columns and pd.api.types.is_numeric_dtype(df_work["TransactionAmt"]):
+        v_amt = df_work["TransactionAmt"].dropna()
+        if not v_amt.empty and v_amt.min() >= 0 and v_amt.max() <= 20.0:
+            df_work["TransactionAmt"] = np.expm1(df_work["TransactionAmt"].astype("float64"))
+
+    padrao_feats = [
+        "TransactionAmt", "tr_null_count", "id_null_count", "M_true_count",
+        "C1", "C2", "C5", "C8", "C13", "C14",
+        "D1_ancora", "D2_ancora", "D4_ancora",
+    ]
+    candidatas = features_continuas if features_continuas is not None else padrao_feats
+    cols_validas = [
+        c for c in candidatas
+        if c in df_work.columns and pd.api.types.is_numeric_dtype(df_work[c])
+    ]
+    if not cols_validas:
+        raise ValueError("Nenhuma feature numérica válida encontrada para o heatmap de Z-Score.")
+
+    medias = df_work.groupby(col_cluster, sort=True)[cols_validas].mean()
+    stds = medias.std(ddof=0).replace(0.0, 1.0).fillna(1.0)
+    zscore_clusters = ((medias - medias.mean()) / stds).fillna(0.0)
+
+    cmap_corp = LinearSegmentedColormap.from_list("corp_reds", ["#F0F0F0", "#BDBDBD", "#CD0000"])
+    altura = max(6.0, 0.55 * len(cols_validas))
+    largura = max(10.0, 1.15 * len(zscore_clusters))
+
+    fig, ax = plt.subplots(figsize=(largura, altura))
+    sns.heatmap(
+        zscore_clusters.T,
+        cmap=cmap_corp,
+        center=0,
+        annot=True,
+        fmt=".1f",
+        linewidths=0.5,
+        cbar_kws={"label": "Z-Score (Desvios da Média Global das Fraudes)"},
+        ax=ax,
+    )
+    ax.set_title(titulo, fontsize=13.5, fontweight="bold", pad=15, loc="left")
+    ax.set_xlabel("ID do Cluster", fontsize=11, fontweight="bold")
+    ax.set_ylabel("Features Numéricas / Comportamentais", fontsize=11, fontweight="bold")
+    ax.tick_params(axis="both", length=0)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+
+    plt.tight_layout()
+    _salvar_figura_opcional(fig, nome_arquivo=nome_arquivo, save_dir=save_dir)
+    return fig
+
+
+# ==============================================================================
+# MANIFESTO DE EXPORTAÇÃO PÚBLICA (API DE UTILS)
+# ==============================================================================
+__all__ = [
+    'histograma_simples',
+    'plot_target_distribution',
+    'analisar_tipos_colunas',
+    'analisar_valores_nulos',
+    'analisar_nulos_por_faixa',
+    'analisar_valores_unicos',
+    'analisar_baixa_cardinalidade',
+    'safe_downcast',
+    'analise_correlacao_pares',
+    'analise_correlação_pares',
+    'calcular_iv_dataset',
+    'analisar_vif',
+    'analisar_e_transformar_caudas_longas',
+    'preparar_dados_modelagem',
+    'avaliar_classificador',
+    'avaliar_classificacao_oot',
+    'plot_feature_importance',
+    'objective_lgbm',
+    'objective_xgb',
+    'objective_cat',
+    'objective_lgbm_grouped',
+    'objective_xgb_grouped',
+    'objective_cat_grouped',
+    'obter_menores_features',
+    'podar_features_por_shap',
+    'extrair_metricas_avaliacao',
+    'exportar_artefatos_modelo',
+    'preparar_dados_clusterizacao',
+    'projetar_pca',
+    'plot_pca_variancia_acumulada',
+    'projetar_umap',
+    'curva_elbow',
+    'avaliar_kmeans_range',
+    'plot_elbow_comparativo',
+    'plot_metricas_validacao',
+    'plot_k_distance_dbscan',
+    'avaliar_grade_dbscan',
+    'plot_metricas_dbscan',
+    'avaliar_grade_hdbscan',
+    'plot_metricas_hdbscan',
+    'avaliar_rotulos_clusterizacao',
+    'plot_distribuicao_clusters',
+    'plot_clusters_2d_plotly',
+    'gerar_perfil_fraude_clusters',
+    'plot_violino_perfil_clusters',
+    'otimizar_dbscan_optuna',
+    'otimizar_hdbscan_optuna',
+    'plot_optuna_clusterizacao',
+    'consolidar_comparacao_clusterizacao',
+    'plot_heatmap_zscore_clusters',
+]
 
