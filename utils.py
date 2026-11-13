@@ -5671,11 +5671,120 @@ def plot_heatmap_zscore_clusters(
 
 
 # ==============================================================================
+# PAINÉIS ANALÍTICOS DA EDA (COMPORTAMENTO DA FRAUDE)
+# ==============================================================================
+def plot_painel_fraude_bivariado(
+    df: pd.DataFrame,
+    col_target: str = 'isFraud',
+    col_hora: str = 'tempo_hora',
+    col_valor: str = 'TransactionAmt',
+    col_canal: str = 'ProductCD',
+    cor_fraude: str = '#d62728',
+    cor_legitima: str = '#4a4a4a',
+    figsize: tuple = (18, 5),
+):
+    """
+    Painel bivariado com 3 gráficos lado a lado:
+      1) Taxa de fraude (%) por hora do dia, com linha da média global;
+      2) Densidade de log1p(valor) por classe (fraude x legítima);
+      3) Taxa de fraude (%) por canal de produto, ordenada do maior para o menor risco.
+
+    Retorna
+    -------
+    fig : matplotlib.figure.Figure
+    """
+    media_global = df[col_target].mean() * 100
+    fig, axes = plt.subplots(1, 3, figsize=figsize)
+
+    # 1. Taxa de Fraude por Hora do Dia
+    hora_stats = df.groupby(col_hora)[col_target].mean() * 100
+    axes[0].plot(hora_stats.index, hora_stats.values, marker='o', color=cor_fraude, linewidth=2)
+    axes[0].axhline(media_global, color='gray', linestyle='--', label=f'Média Global ({media_global:.1f}%)')
+    axes[0].set_title('Taxa de Fraude por Hora do Dia (%)', fontweight='bold')
+    axes[0].set_xlabel('Hora do Dia (0h - 23h)')
+    axes[0].set_ylabel('Taxa de Fraude (%)')
+    axes[0].set_xticks(range(0, 24, 2))
+    axes[0].legend()
+    axes[0].grid(alpha=0.2)
+
+    # 2. Distribuição de Valor (Log) por Classe
+    sns.kdeplot(
+        data=df, x=np.log1p(df[col_valor]),
+        hue=col_target, common_norm=False, fill=True,
+        palette={0: cor_legitima, 1: cor_fraude}, ax=axes[1],
+    )
+    axes[1].set_title(f'Distribuição de log1p({col_valor})', fontweight='bold')
+    axes[1].set_xlabel(f'log1p({col_valor})')
+    axes[1].set_ylabel('Densidade')
+    axes[1].legend(title=col_target, labels=['Fraude (1)', 'Legítima (0)'])
+    axes[1].grid(alpha=0.2)
+
+    # 3. Taxa de Fraude por Canal
+    canal_stats = (df.groupby(col_canal)[col_target].mean() * 100).sort_values(ascending=False)
+    bars = axes[2].bar(canal_stats.index.astype(str), canal_stats.values, color=cor_fraude, alpha=0.85)
+    axes[2].axhline(media_global, color='gray', linestyle='--')
+    axes[2].set_title(f'Taxa de Fraude por Canal ({col_canal})', fontweight='bold')
+    axes[2].set_xlabel(col_canal)
+    axes[2].set_ylabel('Taxa de Fraude (%)')
+    for bar in bars:
+        h = bar.get_height()
+        axes[2].text(bar.get_x() + bar.get_width() / 2, h + 0.2, f'{h:.1f}%', ha='center', fontsize=9)
+    axes[2].grid(axis='y', alpha=0.2)
+
+    plt.tight_layout()
+    plt.show()
+    return fig
+
+
+def plot_evolucao_temporal_fraude(
+    df: pd.DataFrame,
+    col_target: str = 'isFraud',
+    col_dia: str = 'tempo_dia_corrido',
+    cor_fraude: str = '#d62728',
+    cor_volume: str = '#7f7f7f',
+    figsize: tuple = (18, 4.5),
+):
+    """
+    Evolução diária (Concept Drift): barras de volume de transações + linha da taxa
+    de fraude (%) em eixo secundário, com a média global como referência pontilhada.
+
+    Retorna
+    -------
+    evolucao_dia : pd.DataFrame
+        Tabela com colunas [col_dia, 'volume', 'taxa_fraude'].
+    """
+    evolucao_dia = df.groupby(col_dia)[col_target].agg(
+        volume='count',
+        taxa_fraude=lambda x: x.mean() * 100,
+    ).reset_index()
+
+    fig, ax1 = plt.subplots(figsize=figsize)
+    ax1.bar(evolucao_dia[col_dia], evolucao_dia['volume'], color=cor_volume, alpha=0.35, label='Volume de Transações')
+    ax1.set_xlabel('Dias Corridos (TransactionDT)')
+    ax1.set_ylabel('Volume Diário de Transações', color='#4a4a4a')
+    ax1.tick_params(axis='y', labelcolor='#4a4a4a')
+
+    ax2 = ax1.twinx()
+    ax2.plot(evolucao_dia[col_dia], evolucao_dia['taxa_fraude'], color=cor_fraude, linewidth=1.8, label='Taxa de Fraude (%)')
+    ax2.axhline(df[col_target].mean() * 100, color=cor_fraude, linestyle=':', alpha=0.6)
+    ax2.set_ylabel('Taxa de Fraude Diária (%)', color=cor_fraude)
+    ax2.tick_params(axis='y', labelcolor=cor_fraude)
+
+    plt.title('Evolução Temporal: Volume Transacional vs. Taxa de Fraude (Concept Drift)', fontweight='bold')
+    ax1.grid(alpha=0.2)
+    plt.tight_layout()
+    plt.show()
+    return evolucao_dia
+
+
+# ==============================================================================
 # MANIFESTO DE EXPORTAÇÃO PÚBLICA (API DE UTILS)
 # ==============================================================================
 __all__ = [
     'histograma_simples',
     'plot_target_distribution',
+    'plot_painel_fraude_bivariado',
+    'plot_evolucao_temporal_fraude',
     'analisar_tipos_colunas',
     'analisar_valores_nulos',
     'analisar_nulos_por_faixa',
