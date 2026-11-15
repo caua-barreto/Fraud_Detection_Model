@@ -27,7 +27,7 @@ from sklearn.metrics import (
     mean_absolute_error, mean_squared_error, r2_score
 )
 from sklearn.model_selection import (
-    KFold, StratifiedKFold, cross_val_score, cross_val_predict, train_test_split
+    KFold, StratifiedKFold, GroupKFold, cross_val_score, cross_val_predict, train_test_split
 )
 from sklearn.preprocessing import MinMaxScaler, StandardScaler, RobustScaler
 
@@ -105,10 +105,10 @@ def histograma_simples(
 
     # 3. Boxplot Superior (usando a cor personalizada)
     sns.boxplot(x=dados, ax=ax_box, color=color, fliersize=4)
-    ax_box.axvline(media, color='darkorange', linestyle='--', linewidth=1.5)
-    ax_box.axvline(mediana, color='forestgreen', linestyle='--', linewidth=1.5)
+    ax_box.axvline(media, color='#0B2545', linestyle='--', linewidth=1.5)
+    ax_box.axvline(mediana, color='#0096C7', linestyle='--', linewidth=1.5)
     if moda is not None:
-        ax_box.axvline(moda, color='firebrick', linestyle='--', linewidth=1.5)
+        ax_box.axvline(moda, color='#3E7CC4', linestyle='--', linewidth=1.5)
     ax_box.set(xlabel='')
     ax_box.grid(True, linestyle='--', alpha=0.7)
 
@@ -124,10 +124,10 @@ def histograma_simples(
     )
 
     # Adição das linhas verticais estatísticas no histograma
-    ax_hist.axvline(media, color='darkorange', linestyle='--', linewidth=2, label=f'Média: {media:.2f}')
-    ax_hist.axvline(mediana, color='forestgreen', linestyle='--', linewidth=2, label=f'Mediana: {mediana:.2f}')
+    ax_hist.axvline(media, color='#0B2545', linestyle='--', linewidth=2, label=f'Média: {media:.2f}')
+    ax_hist.axvline(mediana, color='#0096C7', linestyle='--', linewidth=2, label=f'Mediana: {mediana:.2f}')
     if moda is not None:
-        ax_hist.axvline(moda, color='firebrick', linestyle='--', linewidth=2, label=f'Moda: {moda:.2f}')
+        ax_hist.axvline(moda, color='#3E7CC4', linestyle='--', linewidth=2, label=f'Moda: {moda:.2f}')
 
     # 5. Formatação e Layout (usando os rótulos personalizados)
     ax_hist.legend(frameon=True, fontsize=10)
@@ -227,7 +227,7 @@ def plot_distribuicao(
     transformacao : str, default='original'
         Tipo de transformação: 'original', 'sqrt', 'log', 'log1p', 'cbrt'.
     cor : str, optional
-        Cor do histograma. Aceita nomes (ex: 'royalblue') ou Hex (ex: '#FF5733').
+        Cor do histograma. Aceita nomes (ex: 'royalblue') ou Hex (ex: '#0096C7').
     bins : int, default=50
         Número de bins do histograma.
     figsize : tuple, default=(10, 6)
@@ -331,7 +331,7 @@ def plot_boxplot_outliers(
     df: pd.DataFrame, 
     coluna: str = 'price', 
     monetario: bool = True, 
-    cor: str = '#D65F5F', 
+    cor: str = '#2E86C1', 
     figsize: tuple = (12, 5)
 ) -> dict:
     """
@@ -345,7 +345,7 @@ def plot_boxplot_outliers(
         Nome da coluna numérica.
     monetario : bool, default=True
         Se True, formata o eixo X com '$' e notação 'K'.
-    cor : str, default='#D65F5F'
+    cor : str, default='#2E86C1'
         Cor de preenchimento do boxplot.
     figsize : tuple, default=(12, 5)
         Dimensões da figura.
@@ -434,7 +434,7 @@ def plot_correlacao_alvo(
     alvo: str = 'price',
     top_n: int = 10,
     metodo: str = 'pearson',
-    cor: str = 'coolwarm',
+    cor: str = 'Blues',
     figsize: tuple = (4, 8)
 ) -> pd.DataFrame:
     """
@@ -546,7 +546,7 @@ def analisar_valores_nulos(
             x='Percentual (%)', 
             y=df_plot.index, 
             data=df_plot, 
-            color='#E66C37', 
+            color='#13579B', 
             edgecolor='black',
             alpha=0.8
         )
@@ -646,7 +646,7 @@ def plot_categoria_preco(
         x=col_cat, 
         y=col_alvo, 
         order=ordem,
-        palette="viridis",
+        palette="Blues_r",
         showfliers=False # Oculta outliers para focar na distribuição de massa central
     )
     
@@ -1041,7 +1041,7 @@ def plot_residuos(
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
 
     ax1.scatter(y_pred, residuos, alpha=0.3, s=10, color='steelblue', edgecolors='none')
-    ax1.axhline(y=0, color='firebrick', linestyle='--', linewidth=1.5)
+    ax1.axhline(y=0, color='#0B2545', linestyle='--', linewidth=1.5)
     ax1.set_xlabel('Valores Preditos', fontsize=11)
     ax1.set_ylabel('Resíduos', fontsize=11)
     ax1.set_title('Resíduos vs Valores Preditos', fontsize=12, fontweight='bold')
@@ -1050,7 +1050,7 @@ def plot_residuos(
     stats.probplot(residuos, dist="norm", plot=ax2)
     ax2.set_title('Q-Q Plot dos Resíduos', fontsize=12, fontweight='bold')
     ax2.get_lines()[0].set(markerfacecolor='steelblue', markeredgecolor='steelblue', markersize=3)
-    ax2.get_lines()[1].set(color='firebrick')
+    ax2.get_lines()[1].set(color='#0B2545')
 
     fig.suptitle(titulo, fontsize=14, fontweight='bold', y=1.02)
     plt.tight_layout()
@@ -1103,7 +1103,7 @@ def plot_feature_importance(
     top_n: int = 20,
     titulo: str = None,
     figsize: tuple = (14, 10),
-    cor: str = 'steelblue',
+    cor: str = '#13579B',
     xlabel: str = None,
     annot: bool = True,
     fmt: str = '.3f',
@@ -1326,7 +1326,7 @@ def pipeline_modelo_completo(
 
 
 def plotar_importancia_shap(dict_shap, features, top_n=15, 
-                            cor_destaque="#00451C", cor_base="#5F9E37", 
+                            cor_destaque="#0B2545", cor_base="#3E7CC4", 
                             fundo_figura='#F8F9FA', cor_texto='#2C3E50'):
     """
     Plota o ranking de importância das variáveis usando valores SHAP.
@@ -1408,7 +1408,7 @@ def plotar_top_coeficientes(df_coefs, top_n=10, titulo='Top Coeficientes do Mode
 
     # 2. Plotagem do Gráfico
     fig, ax = plt.subplots(figsize=(10, 6))
-    colors_top = ['#88B04B' if c >= 0 else '#C0504D' for c in top_features['Coeficiente']]
+    colors_top = ['#0B2545' if c >= 0 else '#48CAE4' for c in top_features['Coeficiente']]
 
     bars = ax.barh(top_features['Feature'], top_features['Coeficiente'], 
                    color=colors_top, edgecolor='white', height=0.7, alpha=0.85)
@@ -1458,7 +1458,7 @@ def plotar_real_vs_predito(modelos_dict, X, y_true_log, cores_dict=None, titulo_
     - modelos_dict: Dicionário com os nomes dos modelos e os estimadores treinados.
     - X: Variáveis preditoras (ex: X_tree).
     - y_true_log: Target verdadeiro em logaritmo (ex: y_tree).
-    - cores_dict: Dicionário mapeando o nome do modelo para a sua cor (ex: {'XGBoost': '#E74C3C'}).
+    - cores_dict: Dicionário mapeando o nome do modelo para a sua cor (ex: {'XGBoost': '#0B2545'}).
     - titulo_geral: Título principal da figura.
     """
     y_real_usd = np.expm1(y_true_log)
@@ -1472,7 +1472,7 @@ def plotar_real_vs_predito(modelos_dict, X, y_true_log, cores_dict=None, titulo_
     if cores_dict is None:
         cores_dict = {}
         
-    cores_fallback = ['#34495E', '#1ABC9C', '#D35400', '#7F8C8D', '#8E44AD']
+    cores_fallback = ['#0B2545', '#13579B', '#0096C7', '#3E7CC4', '#48CAE4']
 
     for idx, (nome, modelo) in enumerate(modelos_dict.items()):
         ax = axes[idx]
@@ -1528,7 +1528,7 @@ def plotar_distribuicao_residuos(modelos_dict, X, y_true_log, cores_dict=None, t
     if cores_dict is None:
         cores_dict = {}
         
-    cores_fallback = ['#34495E', '#1ABC9C', '#D35400', '#7F8C8D', '#8E44AD']
+    cores_fallback = ['#0B2545', '#13579B', '#0096C7', '#3E7CC4', '#48CAE4']
     
     print(f"=== ESTATÍSTICAS DOS RESÍDUOS ===")
 
@@ -1600,7 +1600,7 @@ def plotar_qq_plot_residuos(modelos_dict, X, y_true_log, cores_dict=None, titulo
     if cores_dict is None:
         cores_dict = {}
         
-    cores_fallback = ['#34495E', '#1ABC9C', '#D35400', '#7F8C8D', '#8E44AD']
+    cores_fallback = ['#0B2545', '#13579B', '#0096C7', '#3E7CC4', '#48CAE4']
 
     for idx, (nome, modelo) in enumerate(modelos_dict.items()):
         ax = axes[idx]
@@ -1684,7 +1684,7 @@ def plotar_erros_por_faixa(modelos_dict, X, y_true_log, cores_dict=None, quantis
     
     # 4. Plotagem dos Gráficos
     if cores_dict is None:
-        cores_dict = {'XGBoost Otimizado': '#E74C3C', 'LightGBM Otimizado': '#2E86C1', 'CatBoost Otimizado': '#27AE60'}
+        cores_dict = {'XGBoost Otimizado': '#0B2545', 'LightGBM Otimizado': '#0096C7', 'CatBoost Otimizado': '#5DADE2'}
 
     fig, axes = plt.subplots(1, 2, figsize=(16, 6))
     
@@ -1783,7 +1783,7 @@ def plot_matriz_correlacao(df, titulo='Matriz de Correlação', triangulo=True,
     return corr
 
 
-def plot_nulos_historico(df, limite=40, cor='#E66C37', cor_limite='red',
+def plot_nulos_historico(df, limite=40, cor='#13579B', cor_limite='#0096C7',
                          figsize=(10, 7)):
     """
     Plota percentual de valores ausentes por variável em barras horizontais.
@@ -1794,7 +1794,7 @@ def plot_nulos_historico(df, limite=40, cor='#E66C37', cor_limite='red',
         DataFrame a ser analisado.
     limite : int or float, default=40
         Valor da linha de corte vertical (%).
-    cor : str, default='#E66C37'
+    cor : str, default='#13579B'
         Cor das barras.
     cor_limite : str, default='red'
         Cor da linha de corte.
@@ -1831,8 +1831,8 @@ def plot_nulos_historico(df, limite=40, cor='#E66C37', cor_limite='red',
 
 def plot_analise_temporal(df, col_target='RainTomorrow', col_mes='Month',
                           titulo=None,
-                          cor_acima='#E74C3C', cor_abaixo='#3498DB',
-                          cor_media='#2C3E50', cor_amostras='#7F8C8D',
+                          cor_acima='#0B2545', cor_abaixo='#5DADE2',
+                          cor_media='#0096C7', cor_amostras='#5A6878',
                           figsize=(12, 6)):
     """
     Plota a taxa do alvo por mês com barras coloridas, linha de média global
@@ -1848,7 +1848,7 @@ def plot_analise_temporal(df, col_target='RainTomorrow', col_mes='Month',
         Coluna com o número do mês (1–12).
     titulo : str, optional
         Título principal do gráfico. Se None, gera automaticamente.
-    cor_acima : str, default='#E74C3C'
+    cor_acima : str, default='#0B2545'
         Cor das barras acima da média global.
     cor_abaixo : str, default='#3498DB'
         Cor das barras abaixo da média global.
@@ -1915,7 +1915,7 @@ def plot_grid_distribuicao(
     df: pd.DataFrame,
     features: list,
     titulo: str = 'Distribuição das Features',
-    cor: str = 'steelblue',
+    cor: str = '#13579B',
     bins: str = 'sturges',
     figsize: tuple = (16, 12),
 ):
@@ -1961,10 +1961,10 @@ def plot_grid_distribuicao(
         moda = modas[0] if not modas.empty else None
 
         sns.boxplot(x=dados, ax=ax_box, color=cor, fliersize=4)
-        ax_box.axvline(media, color='darkorange', linestyle='--', linewidth=1.5)
-        ax_box.axvline(mediana, color='forestgreen', linestyle='--', linewidth=1.5)
+        ax_box.axvline(media, color='#0B2545', linestyle='--', linewidth=1.5)
+        ax_box.axvline(mediana, color='#0096C7', linestyle='--', linewidth=1.5)
         if moda is not None:
-            ax_box.axvline(moda, color='firebrick', linestyle='--', linewidth=1.5)
+            ax_box.axvline(moda, color='#3E7CC4', linestyle='--', linewidth=1.5)
 
         ax_box.set_title(f'Distribuição: {col}', fontsize=13, fontweight='bold', pad=10)
         ax_box.set_xlabel('')
@@ -1976,10 +1976,10 @@ def plot_grid_distribuicao(
             color=cor, edgecolor='black', alpha=0.6,
         )
 
-        ax_hist.axvline(media, color='darkorange', linestyle='--', linewidth=2, label=f'Média: {media:.1f}')
-        ax_hist.axvline(mediana, color='forestgreen', linestyle='--', linewidth=2, label=f'Mediana: {mediana:.1f}')
+        ax_hist.axvline(media, color='#0B2545', linestyle='--', linewidth=2, label=f'Média: {media:.1f}')
+        ax_hist.axvline(mediana, color='#0096C7', linestyle='--', linewidth=2, label=f'Mediana: {mediana:.1f}')
         if moda is not None:
-            ax_hist.axvline(moda, color='firebrick', linestyle='--', linewidth=2, label=f'Moda: {moda:.1f}')
+            ax_hist.axvline(moda, color='#3E7CC4', linestyle='--', linewidth=2, label=f'Moda: {moda:.1f}')
 
         ax_hist.legend(frameon=True, fontsize=9, loc='upper right')
         ax_hist.set_xlabel(col, fontsize=11)
@@ -1996,7 +1996,7 @@ def plot_grid_boxplot_alvo(
     alvo: str = 'RainTomorrow',
     hue: str = 'RainToday',
     titulo: str = None,
-    paleta: str = 'Set2',
+    paleta: str = 'Blues',
     labels_x: list = None,
     figsize: tuple = (16, 12),
 ):
@@ -2105,12 +2105,17 @@ def teste_significancia_chi2(
         .reset_index(drop=True)
     )
 
-def avaliar_classificador(modelo, X_train, y_train, X_test, y_test, nome_modelo: str, cv: int = 3, thresholds_dict: dict = None, groups=None):
+def avaliar_classificador(modelo, X_train, y_train, X_test, y_test, nome_modelo: str, cv: int = 3, thresholds_dict: dict = None, groups=None, avaliadores: str = 'todos'):
     """
     Avalia um modelo de classificação binária via validação cruzada no Treino
     (GroupKFold se `groups` fornecido, senão StratifiedKFold) e teste cego em `X_test`.
     Exibe a média real dos folds de treino do CV (`Treino CV`), média dos folds de validação
     (`Val CV` + IC 95%), desempenho em `X_test` (`Teste`) e o gap (`Teste - Treino CV`).
+
+    avaliadores:
+      - 'independentes': apenas métricas de ranqueamento (ROC-AUC, GINI, PR-AUC, KS);
+      - 'dependentes'  : apenas métricas do corte (Accuracy, Precision, Recall);
+      - 'todos'        : ambos os blocos.
     """
     from sklearn.metrics import (
         roc_auc_score, average_precision_score, accuracy_score,
@@ -2118,6 +2123,12 @@ def avaliar_classificador(modelo, X_train, y_train, X_test, y_test, nome_modelo:
     )
     from scipy.stats import ks_2samp
     from sklearn.model_selection import StratifiedKFold, GroupKFold
+
+    opcoes_validas = ('independentes', 'dependentes', 'todos')
+    if avaliadores not in opcoes_validas:
+        raise ValueError(f"`avaliadores` deve ser um de {opcoes_validas}. Recebido: '{avaliadores}'")
+    usar_indep = avaliadores in ('independentes', 'todos')
+    usar_dep   = avaliadores in ('dependentes', 'todos')
 
     threshold = 0.5
     if thresholds_dict is not None and nome_modelo in thresholds_dict:
@@ -2136,7 +2147,8 @@ def avaliar_classificador(modelo, X_train, y_train, X_test, y_test, nome_modelo:
         cv_desc = f"CV = {getattr(cv_splitter, 'n_splits', cv)}"
 
     print(f"{'='*108}")
-    print(f" {nome_modelo.upper()} ({cv_desc} | Threshold = {threshold:.4f})")
+    desc_th = f" | Threshold = {threshold:.4f}" if usar_dep else ""
+    print(f" {nome_modelo.upper()} ({cv_desc}{desc_th})")
     print(f"{'-'*108}")
 
     prop_tr = float(np.mean(y_tr_arr)) * 100
@@ -2161,47 +2173,37 @@ def avaliar_classificador(modelo, X_train, y_train, X_test, y_test, nome_modelo:
 
         # Métricas nos folds de treino do CV (Treino CV)
         probs_f_tr = modelo.predict_proba(X_f_tr)[:, 1]
-        preds_f_tr = (probs_f_tr >= threshold).astype(int)
-        roc_ftr = roc_auc_score(y_f_tr, probs_f_tr)
-        cv_tr_roc.append(roc_ftr)
-        cv_tr_gini.append(2 * roc_ftr - 1)
-        cv_tr_pr.append(average_precision_score(y_f_tr, probs_f_tr))
-        pos_ftr, neg_ftr = probs_f_tr[y_f_tr == 1], probs_f_tr[y_f_tr == 0]
-        cv_tr_ks.append(ks_2samp(pos_ftr, neg_ftr).statistic if (len(pos_ftr) > 0 and len(neg_ftr) > 0) else 0.0)
-        cv_tr_acc.append(accuracy_score(y_f_tr, preds_f_tr))
-        cv_tr_prec.append(precision_score(y_f_tr, preds_f_tr, zero_division=0))
-        cv_tr_rec.append(recall_score(y_f_tr, preds_f_tr, zero_division=0))
+        if usar_indep:
+            roc_ftr = roc_auc_score(y_f_tr, probs_f_tr)
+            cv_tr_roc.append(roc_ftr)
+            cv_tr_gini.append(2 * roc_ftr - 1)
+            cv_tr_pr.append(average_precision_score(y_f_tr, probs_f_tr))
+            pos_ftr, neg_ftr = probs_f_tr[y_f_tr == 1], probs_f_tr[y_f_tr == 0]
+            cv_tr_ks.append(ks_2samp(pos_ftr, neg_ftr).statistic if (len(pos_ftr) > 0 and len(neg_ftr) > 0) else 0.0)
+        if usar_dep:
+            preds_f_tr = (probs_f_tr >= threshold).astype(int)
+            cv_tr_acc.append(accuracy_score(y_f_tr, preds_f_tr))
+            cv_tr_prec.append(precision_score(y_f_tr, preds_f_tr, zero_division=0))
+            cv_tr_rec.append(recall_score(y_f_tr, preds_f_tr, zero_division=0))
 
         # Métricas nos folds de validação do CV (Val CV)
         probs_f_va = modelo.predict_proba(X_f_va)[:, 1]
-        preds_f_va = (probs_f_va >= threshold).astype(int)
-        roc_fva = roc_auc_score(y_f_va, probs_f_va)
-        cv_va_roc.append(roc_fva)
-        cv_va_gini.append(2 * roc_fva - 1)
-        cv_va_pr.append(average_precision_score(y_f_va, probs_f_va))
-        pos_fva, neg_fva = probs_f_va[y_f_va == 1], probs_f_va[y_f_va == 0]
-        cv_va_ks.append(ks_2samp(pos_fva, neg_fva).statistic if (len(pos_fva) > 0 and len(neg_fva) > 0) else 0.0)
-        cv_va_acc.append(accuracy_score(y_f_va, preds_f_va))
-        cv_va_prec.append(precision_score(y_f_va, preds_f_va, zero_division=0))
-        cv_va_rec.append(recall_score(y_f_va, preds_f_va, zero_division=0))
-
-    ic_roc = f"[{np.mean(cv_va_roc) - 2*np.std(cv_va_roc):.4f}, {np.mean(cv_va_roc) + 2*np.std(cv_va_roc):.4f}]"
-    ic_gini = f"[{np.mean(cv_va_gini) - 2*np.std(cv_va_gini):.4f}, {np.mean(cv_va_gini) + 2*np.std(cv_va_gini):.4f}]"
+        if usar_indep:
+            roc_fva = roc_auc_score(y_f_va, probs_f_va)
+            cv_va_roc.append(roc_fva)
+            cv_va_gini.append(2 * roc_fva - 1)
+            cv_va_pr.append(average_precision_score(y_f_va, probs_f_va))
+            pos_fva, neg_fva = probs_f_va[y_f_va == 1], probs_f_va[y_f_va == 0]
+            cv_va_ks.append(ks_2samp(pos_fva, neg_fva).statistic if (len(pos_fva) > 0 and len(neg_fva) > 0) else 0.0)
+        if usar_dep:
+            preds_f_va = (probs_f_va >= threshold).astype(int)
+            cv_va_acc.append(accuracy_score(y_f_va, preds_f_va))
+            cv_va_prec.append(precision_score(y_f_va, preds_f_va, zero_division=0))
+            cv_va_rec.append(recall_score(y_f_va, preds_f_va, zero_division=0))
 
     # Treino final em 100% de X_train e avaliação no X_test de validação (antes do OOT)
     modelo.fit(X_train, y_tr_arr)
     prob_test = modelo.predict_proba(X_test)[:, 1]
-    pred_test = (prob_test >= threshold).astype(int)
-
-    roc_te = roc_auc_score(y_te_arr, prob_test)
-    gini_te = 2 * roc_te - 1
-    pr_te = average_precision_score(y_te_arr, prob_test)
-    pos_te, neg_te = prob_test[y_te_arr == 1], prob_test[y_te_arr == 0]
-    ks_te = ks_2samp(pos_te, neg_te).statistic if (len(pos_te) > 0 and len(neg_te) > 0) else 0.0
-
-    acc_te = accuracy_score(y_te_arr, pred_test)
-    prec_te = precision_score(y_te_arr, pred_test, zero_division=0)
-    rec_te = recall_score(y_te_arr, pred_test, zero_division=0)
 
     def format_row(name, tr_cv, va_cv, val_20, ic="-"):
         gap = val_20 - tr_cv
@@ -2210,20 +2212,36 @@ def avaliar_classificador(modelo, X_train, y_train, X_test, y_test, nome_modelo:
 
     header = f" {'Metrica':<10} | {'Treino':<10} | {'Teste':<10} | {'Validacao':<10} | {'Gap(Va-Tr)':<11} | {'IC 95% (Teste CV)'}"
 
-    print("\n [ METRICAS INDEPENDENTES DO THRESHOLD (Probabilidades) ]")
-    print(header)
-    print("-" * len(header))
-    print(format_row("ROC-AUC", np.mean(cv_tr_roc), np.mean(cv_va_roc), roc_te, ic_roc))
-    print(format_row("GINI", np.mean(cv_tr_gini), np.mean(cv_va_gini), gini_te, ic_gini))
-    print(format_row("PR-AUC", np.mean(cv_tr_pr), np.mean(cv_va_pr), pr_te))
-    print(format_row("KS", np.mean(cv_tr_ks), np.mean(cv_va_ks), ks_te))
+    if usar_indep:
+        ic_roc = f"[{np.mean(cv_va_roc) - 2*np.std(cv_va_roc):.4f}, {np.mean(cv_va_roc) + 2*np.std(cv_va_roc):.4f}]"
+        ic_gini = f"[{np.mean(cv_va_gini) - 2*np.std(cv_va_gini):.4f}, {np.mean(cv_va_gini) + 2*np.std(cv_va_gini):.4f}]"
 
-    print(f"\n [ METRICAS DEPENDENTES DO THRESHOLD (Corte = {threshold:.4f}) ]")
-    print(header)
-    print("-" * len(header))
-    print(format_row("Accuracy", np.mean(cv_tr_acc), np.mean(cv_va_acc), acc_te))
-    print(format_row("Precision", np.mean(cv_tr_prec), np.mean(cv_va_prec), prec_te))
-    print(format_row("Recall", np.mean(cv_tr_rec), np.mean(cv_va_rec), rec_te))
+        roc_te = roc_auc_score(y_te_arr, prob_test)
+        gini_te = 2 * roc_te - 1
+        pr_te = average_precision_score(y_te_arr, prob_test)
+        pos_te, neg_te = prob_test[y_te_arr == 1], prob_test[y_te_arr == 0]
+        ks_te = ks_2samp(pos_te, neg_te).statistic if (len(pos_te) > 0 and len(neg_te) > 0) else 0.0
+
+        print("\n [ METRICAS INDEPENDENTES DO THRESHOLD (Probabilidades) ]")
+        print(header)
+        print("-" * len(header))
+        print(format_row("ROC-AUC", np.mean(cv_tr_roc), np.mean(cv_va_roc), roc_te, ic_roc))
+        print(format_row("GINI", np.mean(cv_tr_gini), np.mean(cv_va_gini), gini_te, ic_gini))
+        print(format_row("PR-AUC", np.mean(cv_tr_pr), np.mean(cv_va_pr), pr_te))
+        print(format_row("KS", np.mean(cv_tr_ks), np.mean(cv_va_ks), ks_te))
+
+    if usar_dep:
+        pred_test = (prob_test >= threshold).astype(int)
+        acc_te = accuracy_score(y_te_arr, pred_test)
+        prec_te = precision_score(y_te_arr, pred_test, zero_division=0)
+        rec_te = recall_score(y_te_arr, pred_test, zero_division=0)
+
+        print(f"\n [ METRICAS DEPENDENTES DO THRESHOLD (Corte = {threshold:.4f}) ]")
+        print(header)
+        print("-" * len(header))
+        print(format_row("Accuracy", np.mean(cv_tr_acc), np.mean(cv_va_acc), acc_te))
+        print(format_row("Precision", np.mean(cv_tr_prec), np.mean(cv_va_prec), prec_te))
+        print(format_row("Recall", np.mean(cv_tr_rec), np.mean(cv_va_rec), rec_te))
     print(f"{'='*108}\n")
 
     return modelo
@@ -2421,11 +2439,11 @@ def plot_sazonalidade_oot(
     tabela_sazonalidade: pd.DataFrame,
     threshold: float,
     figsize: tuple = (22, 9),
-    cor_roc: str = '#1f77b4',
-    cor_pr: str = '#ff7f0e',
-    cor_recall: str = '#2ca02c',
-    cor_f1: str = '#9467bd',
-    cor_taxa: str = '#d62728',
+    cor_roc: str = '#0B2545',
+    cor_pr: str = '#0096C7',
+    cor_recall: str = '#13579B',
+    cor_f1: str = '#3E7CC4',
+    cor_taxa: str = '#48CAE4',
 ):
     """
     Plota dois painéis lado a lado com a evolução sazonal das métricas
@@ -2656,12 +2674,12 @@ def plot_curvas_roc_pr(y_true, y_prob, nome_modelo='', figsize=(14, 6)):
     ax1.set_ylim([0, 1.02])
     ax1.grid(True, linestyle='--', alpha=0.5)
 
-    ax2.plot(recall, precision, color='#ff7f0e', linewidth=2.5,
+    ax2.plot(recall, precision, color='#0096C7', linewidth=2.5,
              label=f'PR-AUC = {pr_auc:.4f}')
     prevalencia = y_true.mean() if hasattr(y_true, 'mean') else np.mean(y_true)
     ax2.axhline(y=prevalencia, color='gray', linestyle='--', alpha=0.5,
                 label=f'Baseline ({prevalencia:.2%})')
-    ax2.fill_between(recall, precision, alpha=0.1, color='#ff7f0e')
+    ax2.fill_between(recall, precision, alpha=0.1, color='#0096C7')
     ax2.set_xlabel('Recall', fontsize=12)
     ax2.set_ylabel('Precision', fontsize=12)
     ax2.set_title('Curva Precision-Recall', fontsize=13, fontweight='bold')
@@ -2702,9 +2720,9 @@ def plot_separacao_scores(y_true, y_prob, nome_modelo='', figsize=(12, 5)):
                  else 'Separação de Scores', fontsize=15, fontweight='bold')
 
     bins = np.linspace(0, 1, 60)
-    ax1.hist(scores_neg, bins=bins, alpha=0.5, color='#1f77b4',
+    ax1.hist(scores_neg, bins=bins, alpha=0.5, color='#8DB6E3',
              density=True, label='Negativo (Não Chove)')
-    ax1.hist(scores_pos, bins=bins, alpha=0.5, color='#d62728',
+    ax1.hist(scores_pos, bins=bins, alpha=0.5, color='#0B2545',
              density=True, label='Positivo (Chove)')
     ax1.set_xlabel('Probabilidade Prevista', fontsize=12)
     ax1.set_ylabel('Densidade', fontsize=12)
@@ -2716,9 +2734,9 @@ def plot_separacao_scores(y_true, y_prob, nome_modelo='', figsize=(12, 5)):
     cdf_pos = np.searchsorted(np.sort(scores_pos), all_sorted, side='right') / len(scores_pos)
     cdf_neg = np.searchsorted(np.sort(scores_neg), all_sorted, side='right') / len(scores_neg)
 
-    ax2.plot(all_sorted, cdf_neg, color='#1f77b4', linewidth=2.5,
+    ax2.plot(all_sorted, cdf_neg, color='#8DB6E3', linewidth=2.5,
              label='CDF Negativo')
-    ax2.plot(all_sorted, cdf_pos, color='#d62728', linewidth=2.5,
+    ax2.plot(all_sorted, cdf_pos, color='#0B2545', linewidth=2.5,
              label='CDF Positivo')
 
     ks_idx = np.argmax(np.abs(cdf_pos - cdf_neg))
@@ -2877,10 +2895,10 @@ def plot_target_distribution(
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
     fig.patch.set_facecolor('#ffffff')
 
-    cor_0 = "#7F8C8D"
-    cor_1 = "#D62728"
+    cor_0 = "#8DB6E3"
+    cor_1 = "#0B2545"
     cores = [cor_0, cor_1]
-    bordas = ["#566573", "#922B21"]
+    bordas = ["#3E7CC4", "#06162B"]
     labels_x = [f"Não Fraude (0)", f"Fraude (1)"]
 
     # --- Painel 1: Quantidade Absoluta ---
@@ -3865,11 +3883,11 @@ def analisar_e_transformar_caudas_longas(
             dados_orig = df[col_orig].dropna()
             dados_log  = df_out[col_log].dropna()
 
-            sns.histplot(dados_orig, bins=50, ax=axes[idx, 0], color='#d62728', kde=False)
+            sns.histplot(dados_orig, bins=50, ax=axes[idx, 0], color='#48CAE4', kde=False)
             axes[idx, 0].set_title(f"{col_orig} — Original (Skew: {sk_old:.2f})")
             axes[idx, 0].set_yscale('log') # Escala log no eixo Y para enxergar a cauda
 
-            sns.histplot(dados_log, bins=50, ax=axes[idx, 1], color='#1f77b4', kde=True)
+            sns.histplot(dados_log, bins=50, ax=axes[idx, 1], color='#0B2545', kde=True)
             axes[idx, 1].set_title(f"{col_log} — Pós log1p (Skew: {sk_new:.2f})")
 
         plt.tight_layout()
@@ -4455,6 +4473,1630 @@ def exportar_artefatos_modelo(
 
 
 # ==============================================================================
+# PODA DE FEATURES (CURVA SHAP), OPTUNA DOS BOOSTINGS E ANÁLISE DE THRESHOLD
+# ==============================================================================
+
+_PALETA_POLITICAS = ['#97A3B0', '#5DADE2', '#0096C7', '#13579B', '#0B2545']
+
+
+def _limpar_bordas(ax):
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+
+def curva_poda_features_shap(
+    modelo,
+    ranking_features: List[str],
+    X_train: pd.DataFrame,
+    y_train,
+    X_test: pd.DataFrame,
+    y_test,
+    metrica: str = 'ROC_AUC',  # Opções: 'ROC_AUC' ou 'GINI'
+    passo: int = 10,
+    min_features: int = 10,
+    tolerancia: float = 0.0010,
+    figsize: tuple = (12, 5),
+    titulo: str = None,
+    cor: str = '#13579B',
+) -> Tuple[pd.DataFrame, pd.DataFrame, List[str], List[str]]:
+    """
+    Re-treina o modelo removendo features em lotes baseados no ranking SHAP.
+    Avalia os resultados sem usar prints, exportando tudo em DataFrames.
+    
+    Retorna:
+    - df_curva: Histórico completo de todas as iterações.
+    - df_resumo: Tabela comparativa dos 2 modelos alvos.
+    - features_max: Lista de features do modelo de maior índice absoluto.
+    - features_otimizadas: Lista de features do modelo mais enxuto dentro da tolerância.
+    """
+    y_te = np.asarray(y_test)
+    total = len(ranking_features)
+    grid_n = list(range(total, min_features - 1, -passo))
+    
+    if grid_n[-1] != min_features and min_features < total:
+        grid_n.append(min_features)
+
+    nome_cls = modelo.__class__.__name__
+    linhas = []
+    
+    # 1. Loop de treinamento sem prints
+    for n in grid_n:
+        cols = ranking_features[:n]
+        m = modelo.__class__(**modelo.get_params())
+        
+        if 'CatBoost' in nome_cls or 'XGB' in nome_cls:
+            m.fit(X_train[cols], y_train, verbose=False)
+        else:
+            m.fit(X_train[cols], y_train)
+            
+        probs = m.predict_proba(X_test[cols])[:, 1]
+        
+        roc = roc_auc_score(y_te, probs)
+        gini = (2 * roc) - 1
+        pr = average_precision_score(y_te, probs)
+        
+        linhas.append({
+            'N_Features': n,
+            'Removidas': total - n,
+            'ROC_AUC': roc,
+            'GINI': gini,
+            'PR_AUC': pr,
+        })
+
+    df_curva = pd.DataFrame(linhas)
+    col_metrica = metrica.upper()
+
+    # 2. Definição dos 2 modelos
+    val_full = float(df_curva.loc[df_curva['N_Features'] == total, col_metrica].iloc[0])
+
+    # Modelo 1: Maior Índice Absoluto
+    idx_max = df_curva[col_metrica].idxmax()
+    n_max = int(df_curva.loc[idx_max, 'N_Features'])
+    val_max = float(df_curva.loc[idx_max, col_metrica])
+
+    # Modelo 2: Mais Otimizado na faixa de tolerância
+    aceitaveis = df_curva[df_curva[col_metrica] >= (val_full - tolerancia)]
+    n_otimizado = int(aceitaveis['N_Features'].min())
+    val_otimizado = float(df_curva.loc[df_curva['N_Features'] == n_otimizado, col_metrica].iloc[0])
+
+    # 3. DataFrame de Resumo (Substitui os antigos prints)
+    df_resumo = pd.DataFrame([
+        {
+            'Perfil_Modelo': '1. Maior Índice Absoluto',
+            'N_Features': n_max,
+            'Removidas': total - n_max,
+            col_metrica: val_max,
+            'Delta_vs_Completo': val_max - val_full
+        },
+        {
+            'Perfil_Modelo': '2. Otimizado (Lim. Tolerância)',
+            'N_Features': n_otimizado,
+            'Removidas': total - n_otimizado,
+            col_metrica: val_otimizado,
+            'Delta_vs_Completo': val_otimizado - val_full
+        }
+    ])
+
+    # 4. Construção do Gráfico
+    if titulo is None:
+        titulo = f'{col_metrica} em Função da Redução de Features (ranking |SHAP|)'
+
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.plot(df_curva['N_Features'], df_curva[col_metrica], color=cor, lw=2.2, marker='o', ms=5, label=f'{col_metrica} (Validação)')
+    ax.axhline(val_full, color='#0B2545', ls=':', lw=1.2, label=f'Completo ({total} feat) = {val_full:.4f}')
+    ax.axhspan(val_full - tolerancia, val_full + tolerancia, color='#8DB6E3', alpha=0.22, label=f'Tolerância ± {tolerancia:.4f}')
+    
+    # Marcador do modelo otimizado
+    ax.axvline(n_otimizado, color='#0096C7', ls='--', lw=1.8, label=f'Otimizado: {n_otimizado} feat ({val_otimizado:.4f})')
+    
+    # Marcador do modelo de maior índice (se diferir do otimizado)
+    if n_max != n_otimizado:
+        ax.axvline(n_max, color=cor, ls='-.', lw=1.2, alpha=0.8, label=f'Maior Índice: {n_max} feat ({val_max:.4f})')
+    else:
+        ax.axhline(val_max, color=cor, ls='-.', lw=1.2, alpha=0.8, label=f'Maior {col_metrica} = {val_max:.4f}')
+
+    ax.invert_xaxis()
+    ax.set_title(titulo, fontsize=12, fontweight='bold', loc='left')
+    ax.set_xlabel('Número de Features Mantidas (menos relevantes removidas primeiro)')
+    ax.set_ylabel(f'{col_metrica} (Validação)')
+    ax.grid(axis='y', linestyle=':', alpha=0.5)
+    
+    # Legenda fora da curva para não misturar visualmente
+    ax.legend(frameon=False, loc='center left', bbox_to_anchor=(1, 0.5))
+
+    # Limpar bordas
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+    plt.tight_layout()
+    plt.show()
+
+    # 5. Listas de Features exportadas
+    features_max = list(ranking_features[:n_max])
+    features_otimizadas = list(ranking_features[:n_otimizado])
+
+    return df_curva, df_resumo, features_max, features_otimizadas
+
+
+def plot_optuna_boostings(studies: Dict[str, Any], figsize: tuple = (16, 5)):
+    """
+    Painel analítico comparando os estudos Optuna dos boostings:
+      (1) convergência — ROC-AUC de cada trial e melhor valor acumulado;
+      (2) dispersão do ROC-AUC entre trials (sensibilidade aos hiperparâmetros).
+    """
+    cores = ['#0B2545', '#0096C7', '#5DADE2']
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize, gridspec_kw={'width_ratios': [2, 1]})
+
+    dados_box, nomes = [], []
+    for (nome, study), cor in zip(studies.items(), cores):
+        valores = np.array([t.value for t in study.trials if t.value is not None])
+        trials = np.arange(1, len(valores) + 1)
+        ax1.scatter(trials, valores, color=cor, alpha=0.35, s=22)
+        ax1.plot(trials, np.maximum.accumulate(valores), color=cor, lw=2.2,
+                 label=f'{nome} (melhor = {valores.max():.4f})')
+        dados_box.append(valores)
+        nomes.append(nome)
+
+    ax1.set_title('Convergência do Optuna — ROC-AUC por Trial (GroupKFold)', fontsize=12, fontweight='bold', loc='left')
+    ax1.set_xlabel('Trial')
+    ax1.set_ylabel('ROC-AUC médio (CV)')
+    ax1.grid(axis='y', linestyle=':', alpha=0.5)
+    ax1.legend(frameon=False, loc='lower right')
+
+    bp = ax2.boxplot(dados_box, patch_artist=True, widths=0.5)
+    ax2.set_xticks(range(1, len(nomes) + 1))
+    ax2.set_xticklabels(nomes)
+    for patch, cor in zip(bp['boxes'], cores):
+        patch.set_facecolor(cor)
+        patch.set_alpha(0.35)
+    for i, valores in enumerate(dados_box, start=1):
+        ax2.scatter(i, valores.max(), marker='*', s=160, color='#0096C7', edgecolor='#0B2545', linewidth=0.8, zorder=3)
+    ax2.set_title('Dispersão entre Trials (★ = melhor)', fontsize=12, fontweight='bold', loc='left')
+    ax2.set_ylabel('ROC-AUC médio (CV)')
+    ax2.grid(axis='y', linestyle=':', alpha=0.5)
+
+    for ax in (ax1, ax2):
+        _limpar_bordas(ax)
+    plt.tight_layout()
+    plt.show()
+
+    resumo = pd.DataFrame({
+        'Modelo': nomes,
+        'Melhor_AUC': [v.max() for v in dados_box],
+        'Mediana_AUC': [np.median(v) for v in dados_box],
+        'Desvio_AUC': [v.std() for v in dados_box],
+        'Trials': [len(v) for v in dados_box],
+    }).sort_values('Melhor_AUC', ascending=False).reset_index(drop=True)
+    return resumo
+
+
+def gerar_probs_calibradas(classe_modelo, params: dict, X_train, y_train, X_val, groups, n_splits: int = 4):
+    """
+    1. Gera probabilidades Out-of-Fold no Treino via GroupKFold temporal (sem leakage);
+    2. Treina o modelo em 100% do Treino e prediz a Validação;
+    3. Ajusta a Calibração Isotônica APENAS no OOF e aplica no OOF e na Validação.
+    """
+    from sklearn.isotonic import IsotonicRegression
+    from sklearn.model_selection import GroupKFold
+
+    gkf = GroupKFold(n_splits=min(n_splits, len(np.unique(groups))))
+    oof_raw = np.zeros(len(X_train))
+    for tr_idx, va_idx in gkf.split(X_train, y_train, groups=groups):
+        m = classe_modelo(**params)
+        m.fit(X_train.iloc[tr_idx], y_train.iloc[tr_idx])
+        oof_raw[va_idx] = m.predict_proba(X_train.iloc[va_idx])[:, 1]
+
+    modelo_full = classe_modelo(**params)
+    modelo_full.fit(X_train, y_train)
+    val_raw = modelo_full.predict_proba(X_val)[:, 1]
+
+    calibrador = IsotonicRegression(out_of_bounds='clip')
+    oof_cal = calibrador.fit_transform(oof_raw, y_train)
+    val_cal = calibrador.transform(val_raw)
+
+    return {
+        'oof_raw': oof_raw, 'oof_cal': oof_cal,
+        'val_raw': val_raw, 'val_cal': val_cal,
+        'modelo_full': modelo_full, 'calibrador': calibrador,
+    }
+
+
+def threshold_calibrado_para_bruto(calibrador, threshold_cal: float) -> float:
+    """
+    Converte um corte no espaço CALIBRADO (isotônico) para o corte equivalente na
+    probabilidade BRUTA do modelo (a isotônica é monotônica não decrescente).
+    """
+    xs = np.asarray(calibrador.X_thresholds_, dtype=float)
+    ys = np.asarray(calibrador.y_thresholds_, dtype=float)
+    idx = int(np.argmax(ys >= threshold_cal))
+    if ys[idx] < threshold_cal:
+        return float(xs[-1] + 1e-12)
+    if idx == 0 or ys[idx] == ys[idx - 1]:
+        return float(xs[idx])
+    frac = (threshold_cal - ys[idx - 1]) / (ys[idx] - ys[idx - 1])
+    return float(xs[idx - 1] + frac * (xs[idx] - xs[idx - 1]))
+
+
+def obter_amt_real(df: pd.DataFrame, col: str = 'TransactionAmt') -> np.ndarray:
+    """Retorna TransactionAmt em US$ reais (reverte log1p se a coluna estiver em escala log)."""
+    valores = df[col].values.astype(float)
+    return np.expm1(valores) if df[col].mean() < 10 else valores
+
+
+def blocos_mensais(df: pd.DataFrame, col_dt: str = 'TransactionDT') -> np.ndarray:
+    """Índice do bloco mensal (30 dias) de cada transação."""
+    return (df[col_dt] // (3600 * 24 * 30)).astype(int).values
+
+
+def calcular_score_financeiro(y_true, y_pred_block, amt, exibir_detalhes=False, titulo=""):
+    """
+    Score financeiro conforme regra de negócio (em US$ reais):
+      VP = Fraude evitada (0 custo direto) | VN = +0.02 * Amt
+      FP = -0.02 * Amt (receita perdida)  | FN = -1.00 * Amt (chargeback)
+    """
+    y_true = np.asarray(y_true)
+    amt = np.asarray(amt, dtype=float)
+    bloqueado = np.asarray(y_pred_block, dtype=bool)
+    aprovado = ~bloqueado
+
+    vp = bloqueado & (y_true == 1)
+    vn = aprovado  & (y_true == 0)
+    fp = bloqueado & (y_true == 0)
+    fn = aprovado  & (y_true == 1)
+
+    qtd_vp, qtd_vn = int(vp.sum()), int(vn.sum())
+    qtd_fp, qtd_fn = int(fp.sum()), int(fn.sum())
+
+    vol_vp = float(amt[vp].sum())
+    vol_vn = float(amt[vn].sum())
+    vol_fp = float(amt[fp].sum())
+    vol_fn = float(amt[fn].sum())
+
+    receita_vn  = 0.02 * vol_vn
+    penal_fp    = 0.02 * vol_fp
+    prejuizo_fn = 1.00 * vol_fn
+    perda_total = penal_fp + prejuizo_fn
+    resultado_liquido = receita_vn - perda_total
+
+    approval_rate = qtd_vn / max(1, (y_true == 0).sum())
+    recall = qtd_vp / max(1, (y_true == 1).sum())
+    precision = qtd_vp / max(1, bloqueado.sum())
+
+    resultado = {
+        'Resultado_Liquido': resultado_liquido,
+        'Receita_VN': receita_vn,
+        'Penalidade_FP': penal_fp,
+        'Prejuizo_FN': prejuizo_fn,
+        'Perda_Total_FP_FN': perda_total,
+        'Fraude_Evitada_VP': vol_vp,
+        'Volume_VN_USD': vol_vn,
+        'Volume_FP_USD': vol_fp,
+        'Qtd_VP': qtd_vp,
+        'Qtd_VN': qtd_vn,
+        'Qtd_FP': qtd_fp,
+        'Qtd_FN': qtd_fn,
+        'Approval_Rate': approval_rate,
+        'Recall': recall,
+        'Precision': precision,
+    }
+
+    if exibir_detalhes:
+        cabecalho = f"DETALHAMENTO FINANCEIRO — {titulo}" if titulo else "DETALHAMENTO FINANCEIRO"
+        print("=" * 88)
+        print(cabecalho)
+        print("-" * 88)
+        print(f"[+] GANHO  (VN — Legítimas Aprovadas | +2% MDR): "
+              f"{qtd_vn:>7,} tx | Vol: $ {vol_vn:>14,.2f} | Receita: +$ {receita_vn:>12,.2f}")
+        print(f"[*] EVITADO (VP — Fraudes Bloqueadas |  0% MDR): "
+              f"{qtd_vp:>7,} tx | Fraude Evitada:             $ {vol_vp:>12,.2f}")
+        print(f"[-] PERDA FP (Clientes Bons Bloqueados | -2% MDR): "
+              f"{qtd_fp:>7,} tx | Vol: $ {vol_fp:>14,.2f} | Perda:   -$ {penal_fp:>12,.2f}")
+        print(f"[-] PERDA FN (Fraudes Não Detectadas   | -100%):  "
+              f"{qtd_fn:>7,} tx | Chargeback:                 -$ {prejuizo_fn:>12,.2f}")
+        print("-" * 88)
+        print(f"Perda Total (FP + FN): -$ {perda_total:>12,.2f} | "
+              f"RESULTADO LÍQUIDO: $ {resultado_liquido:>14,.2f}")
+        print(f"Aprovação (VN): {approval_rate*100:.2f}% | Recall (VP): {recall*100:.2f}% | Precision: {precision*100:.2f}%")
+        print("=" * 88)
+
+    return resultado
+
+
+# ------------------------------------------------------------------------------
+# THRESHOLD FIXO (SEÇÃO 7.2): BUSCA NO TREINO E RESULTADO TOTAL POR BASE
+# ------------------------------------------------------------------------------
+_CORES_MODELOS = {
+    'LGBM_Max':       {'solida': '#0077B6', 'media': '#00B4D8', 'clara': '#90E0EF'},
+    'LGBM_Otimizado': {'solida': '#0B2545', 'media': '#13579B', 'clara': '#8DB6E3'},
+}
+_CORES_EXTRAS = [
+    {'solida': '#1D3557', 'media': '#457B9D', 'clara': '#A8DADC'},
+    {'solida': '#023E8A', 'media': '#0096C7', 'clara': '#ADE8F4'},
+]
+
+
+def _cor_modelo(nome: str, idx: int = 0) -> Dict[str, str]:
+    return _CORES_MODELOS.get(nome, _CORES_EXTRAS[idx % len(_CORES_EXTRAS)])
+
+
+def threshold_equilibrio(mdr: float = 0.02, perda_fraude: float = 1.00) -> float:
+    """
+    Corte teórico de equilíbrio para uma probabilidade CALIBRADA p:
+      Aprovar  -> (1 - p) * (+mdr) + p * (-perda_fraude)
+      Bloquear -> (1 - p) * (-mdr) + p * 0
+    Bloquear compensa quando p * perda_fraude > (1 - p) * 2 * mdr, ou seja,
+    p* = 2·mdr / (perda_fraude + 2·mdr). O valor da transação se cancela.
+    """
+    return 2 * mdr / (perda_fraude + 2 * mdr)
+
+
+def curva_lucro_threshold(y_true, probs, amt, thresholds) -> pd.DataFrame:
+    """
+    Lucro líquido e métricas operacionais para cada threshold fixo (bloqueia se prob >= threshold).
+    Implementação vetorizada (ordenação + somas acumuladas): exata e rápida para milhares de cortes.
+    """
+    y = np.asarray(y_true).astype(int)
+    p = np.asarray(probs, dtype=float)
+    a = np.asarray(amt, dtype=float)
+    t = np.asarray(thresholds, dtype=float)
+
+    ordem = np.argsort(p, kind='mergesort')
+    p_s, y_s, a_s = p[ordem], y[ordem], a[ordem]
+
+    v_aprovar = np.where(y_s == 0, 0.02 * a_s, -a_s)    # VN = +2% | FN = -100%
+    v_bloquear = np.where(y_s == 0, -0.02 * a_s, 0.0)   # FP = -2%  | VP = 0
+
+    def _sufixo(v):
+        return np.concatenate([np.cumsum(v[::-1])[::-1], [0.0]])
+
+    suf_ganho_bloqueio = _sufixo(v_bloquear - v_aprovar)
+    suf_fraude = _sufixo(y_s.astype(float))
+    suf_legit = _sufixo((1 - y_s).astype(float))
+
+    idx = np.searchsorted(p_s, t, side='left')           # primeiro índice com prob >= threshold
+    n_fraude, n_legit = max(1, int(y.sum())), max(1, int((y == 0).sum()))
+    fraudes_bloq, legit_bloq = suf_fraude[idx], suf_legit[idx]
+    n_bloq = fraudes_bloq + legit_bloq
+
+    return pd.DataFrame({
+        'Threshold': t,
+        'Lucro': v_aprovar.sum() + suf_ganho_bloqueio[idx],
+        'Aprovacao': 1 - legit_bloq / n_legit,
+        'Recall': fraudes_bloq / n_fraude,
+        'Precision': np.divide(fraudes_bloq, n_bloq, out=np.zeros_like(n_bloq), where=n_bloq > 0),
+    })
+
+
+def otimizar_threshold_fixo(y_true, probs, amt, t_max: float = 0.50) -> Dict[str, float]:
+    """
+    Busca EXATA do threshold fixo de maior lucro: avalia todos os valores distintos de probabilidade
+    (cada um é um corte diferente). O threshold retornado é o ponto médio entre o nível vencedor e o
+    nível imediatamente abaixo: mesmo lucro na base de busca, com margem máxima para bases novas.
+    """
+    p = np.asarray(probs, dtype=float)
+    niveis = np.unique(p)
+    niveis = niveis[(niveis > 0) & (niveis <= t_max)]
+    curva = curva_lucro_threshold(y_true, p, amt, niveis)
+    i = int(curva['Lucro'].values.argmax())
+    anterior = niveis[i - 1] if i > 0 else 0.0
+    melhor = curva.iloc[i]
+    return {
+        'Threshold': float((niveis[i] + anterior) / 2),
+        'Lucro': float(melhor['Lucro']),
+        'Aprovacao': float(melhor['Aprovacao']),
+        'Recall': float(melhor['Recall']),
+        'Precision': float(melhor['Precision']),
+    }
+
+
+def tabela_varredura_threshold_fixo(
+    threshold_otimo: Dict[str, float], curvas: Dict[str, pd.DataFrame], pct_plato: float = 0.95,
+    p_equilibrio: Optional[float] = None,
+) -> pd.DataFrame:
+    """Resumo da busca no OOF do Treino: corte ótimo, lucro máximo, platô e taxas operacionais no pico."""
+    linhas = []
+    for nome, cv in curvas.items():
+        th = threshold_otimo[nome]
+        x = cv['Threshold'].values
+        lucro_max = float(np.interp(th, x, cv['Lucro'].values))
+        aprov_ot  = float(np.interp(th, x, cv['Aprovacao'].values))
+        rec_ot    = float(np.interp(th, x, cv['Recall'].values))
+        prec_ot   = float(np.interp(th, x, cv['Precision'].values))
+        plato = cv.loc[cv['Lucro'] >= pct_plato * lucro_max, 'Threshold']
+        linha = {
+            'Modelo': nome,
+            'Corte Ótimo': th,
+            f'Platô ≥{pct_plato:.0%} do Lucro': f"{plato.min():.2%} – {plato.max():.2%}",
+            'Lucro Máximo (Treino OOF)': lucro_max,
+            'Aprovação no Ótimo': aprov_ot,
+            'Recall no Ótimo': rec_ot,
+            'Precision no Ótimo': prec_ot,
+        }
+        if p_equilibrio is not None:
+            linha['Equilíbrio Teórico'] = p_equilibrio
+        linhas.append(linha)
+    return pd.DataFrame(linhas).set_index('Modelo')
+
+
+def _estilo_limpo(ax):
+    """Estética padrão dos gráficos da Seção 7: grid horizontal suave, só a borda inferior, sem ticks."""
+    ax.grid(axis='y', ls='-', lw=0.6, color='#EAEAEA')
+    ax.grid(axis='x', visible=False)
+    ax.set_axisbelow(True)
+    for spine in ['top', 'right', 'left']:
+        ax.spines[spine].set_visible(False)
+    ax.spines['bottom'].set_color('#CCCCCC')
+    ax.tick_params(axis='both', colors='#555555', length=0, pad=5)
+
+
+def _desenhar_curva_lucro_ax(
+    ax, curva: pd.DataFrame, threshold_otimo: float, nome_modelo: str, idx_cor: int = 0,
+    p_equilibrio: Optional[float] = None, pct_plato: float = 0.95, y_limits: Optional[tuple] = None,
+):
+    """Renderiza uma curva de lucro limpa e minimalista (sem caixas/setas poluindo o gráfico)."""
+    cores = _cor_modelo(nome_modelo, idx_cor)
+    cor = cores['solida']
+    x = curva['Threshold'].values
+    y = curva['Lucro'].values / 1e3
+    lucro_ot = float(np.interp(threshold_otimo, x, y))
+
+    if y_limits is not None:
+        ax.set_ylim(*y_limits)
+    else:
+        y_lo, y_hi = min(0.0, float(y.min())), float(y.max())
+        span = max(1.0, y_hi - y_lo)
+        ax.set_ylim(y_lo - 0.08 * span, y_hi + 0.18 * span)
+
+    ax.set_xlim(float(x.min()), float(x.max()))
+
+    # Platô sombreado discreto (informado na legenda)
+    if lucro_ot > 0:
+        msk = y >= pct_plato * lucro_ot
+        if msk.any():
+            p_min, p_max = float(x[msk].min()), float(x[msk].max())
+            ax.axvspan(p_min, p_max, color=cor, alpha=0.08, lw=0,
+                       label=f'Platô ≥{pct_plato:.0%} ({p_min:.1%} – {p_max:.1%})')
+
+    # Linha zero e curva principal
+    ax.axhline(0, color='#1A1A1A', lw=0.9)
+    ax.fill_between(x, y, 0, where=(y >= 0), interpolate=True, color=cor, alpha=0.05, lw=0)
+    ax.plot(x, y, color=cor, lw=2.6, label='Lucro Líquido (OOF)')
+
+    # Equilíbrio teórico (apenas linha tracejada discreta + legenda)
+    if p_equilibrio is not None:
+        ax.axvline(p_equilibrio, color='#777777', ls=':', lw=1.5,
+                   label=f'Equilíbrio Teórico ({p_equilibrio:.2%})')
+
+    # Ponto ótimo: marcador + rótulo curto direto acima do pico
+    ax.vlines(threshold_otimo, 0, lucro_ot, color=cor, linestyle='--', lw=1.3, alpha=0.7)
+    ax.scatter([threshold_otimo], [lucro_ot], color=cor, s=90, edgecolor='white', linewidth=1.8, zorder=5,
+               label=f'Corte Ótimo: {threshold_otimo:.2%} (US$ {lucro_ot:,.1f}k)')
+    ax.annotate(
+        f"{threshold_otimo:.2%}  (US$ {lucro_ot:,.1f} mil)",
+        xy=(threshold_otimo, lucro_ot), xytext=(0, 10), textcoords='offset points',
+        ha='center', va='bottom', fontsize=10, fontweight='bold', color=cor,
+    )
+
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(0.02))
+    ax.xaxis.set_major_formatter(ticker.PercentFormatter(xmax=1, decimals=0))
+    ax.yaxis.set_major_formatter(ticker.StrMethodFormatter('US$ {x:,.0f}k'))
+    ax.set_xlabel('Threshold de bloqueio (probabilidade calibrada)', fontsize=11, color='#333333', labelpad=8)
+    ax.set_ylabel('Lucro líquido (US$ mil)', fontsize=11, color='#333333', labelpad=8)
+    ax.set_title(f'Lucro por Threshold Fixo — {nome_modelo} (Treino OOF)',
+                 fontsize=13, fontweight='heavy', loc='left', pad=12, color='#1A1A1A')
+    ax.legend(frameon=False, fontsize=9.5, loc='upper right')
+    _estilo_limpo(ax)
+
+
+def plot_curva_lucro_threshold(
+    curva, threshold_otimo, nome_modelo: str = '',
+    p_equilibrio: Optional[float] = None, pct_plato: float = 0.95,
+    titulo: str = '', figsize: Optional[tuple] = None,
+):
+    """
+    Curva limpa de lucro líquido (US$ mil) por threshold fixo.
+    Aceita um único DataFrame (um modelo por célula) ou um dict de DataFrames.
+    """
+    if isinstance(curva, dict):
+        nomes = list(curva.keys())
+        n_mod = len(nomes)
+        figsize = figsize or (7.5 * n_mod, 4.8)
+        fig, axes = plt.subplots(1, n_mod, figsize=figsize, sharey=True)
+        if n_mod == 1:
+            axes = [axes]
+
+        all_y = np.concatenate([df_c['Lucro'].values / 1e3 for df_c in curva.values()])
+        y_lo, y_hi = min(0.0, float(all_y.min())), float(all_y.max())
+        span = max(1.0, y_hi - y_lo)
+        y_limits = (y_lo - 0.08 * span, y_hi + 0.18 * span)
+
+        for i, (ax, nome) in enumerate(zip(axes, nomes)):
+            th_m = threshold_otimo[nome] if isinstance(threshold_otimo, dict) else float(threshold_otimo)
+            _desenhar_curva_lucro_ax(
+                ax, curva[nome], th_m, nome, idx_cor=i,
+                p_equilibrio=p_equilibrio, pct_plato=pct_plato, y_limits=y_limits,
+            )
+            if i > 0:
+                ax.set_ylabel('')
+                ax.tick_params(labelleft=True)
+
+        if titulo:
+            fig.suptitle(titulo, fontsize=13.5, fontweight='heavy', x=0.01, ha='left', y=1.02, color='#1A1A1A')
+        plt.tight_layout()
+        plt.show()
+        return
+
+    figsize = figsize or (11, 4.8)
+    fig, ax = plt.subplots(figsize=figsize)
+    _desenhar_curva_lucro_ax(
+        ax, curva, float(threshold_otimo), nome_modelo or 'Modelo',
+        p_equilibrio=p_equilibrio, pct_plato=pct_plato,
+    )
+    if titulo:
+        ax.set_title(titulo, fontsize=13, fontweight='heavy', loc='left', pad=12, color='#1A1A1A')
+    plt.tight_layout()
+    plt.show()
+
+
+_ROTULO_CURTO_POLITICA = {
+    'Sem Modelo': 'sem modelo',
+    'Clássico 0.50': '0.50',
+    'Fixo Ótimo': 'fixo',
+    'Dinâmico (Optuna)': 'dinâmico',
+}
+
+
+def politicas_threshold(prob_raw, prob_cal, threshold_fixo: float, threshold_dinamico_arr=None) -> Dict[str, np.ndarray]:
+    """Máscaras de bloqueio de cada política (True = bloqueia)."""
+    prob_raw, prob_cal = np.asarray(prob_raw), np.asarray(prob_cal)
+    politicas = {
+        'Sem Modelo': np.zeros(len(prob_raw), dtype=bool),
+        'Clássico 0.50': prob_raw >= 0.50,
+        'Fixo Ótimo': prob_cal >= threshold_fixo,
+    }
+    if threshold_dinamico_arr is not None:
+        politicas['Dinâmico (Optuna)'] = prob_cal >= np.asarray(threshold_dinamico_arr)
+    return politicas
+
+
+def resumo_politicas(y_true, amt, politicas_por_modelo: Dict[str, Dict[str, np.ndarray]], base: str) -> pd.DataFrame:
+    """DRE total de cada política, por modelo, em uma base (índice: Base, Modelo, Política)."""
+    linhas = []
+    for nome, politicas in politicas_por_modelo.items():
+        for pol, bloqueio in politicas.items():
+            r = calcular_score_financeiro(y_true, bloqueio, amt)
+            linhas.append({
+                'Base': base, 'Modelo': nome, 'Política': pol,
+                'Lucro Líquido': r['Resultado_Liquido'],
+                'Receita VN (+2%)': r['Receita_VN'],
+                'Perda FP (−2%)': r['Penalidade_FP'],
+                'Chargeback FN (−100%)': r['Prejuizo_FN'],
+                'Aceitação Geral': 1 - (r['Qtd_VP'] + r['Qtd_FP']) / max(1, len(bloqueio)),
+                'Aprovação': r['Approval_Rate'],
+                'Recall': r['Recall'],
+                'Precision': r['Precision'],
+            })
+    return pd.DataFrame(linhas).set_index(['Base', 'Modelo', 'Política'])
+
+
+def estilizar_resumo_politicas(df_resumo: pd.DataFrame, politica_destaque: str = 'Fixo Ótimo'):
+    """
+    Styler de alto contraste (compatível com tema escuro e claro do VS Code/Colab) para `resumo_politicas`
+    e `tabela_consolidada_treino_validacao`. Define cores explícitas de fundo e de fonte em todas as células.
+    """
+    fundos_normais = {
+        'Treino (OOF)': '#F5F9FD',
+        'Validação': '#EBF5FB',
+        'Treino + Validação (Unido)': '#E3F2FD',
+    }
+    fundos_destaque = {
+        'Treino (OOF)': '#D6EAF8',
+        'Validação': '#AED6F1',
+        'Treino + Validação (Unido)': '#90CAF9',
+    }
+    bases = list(dict.fromkeys(df_resumo.index.get_level_values('Base')))
+    primeiras_linhas = {df_resumo.index[df_resumo.index.get_level_values('Base') == b][0] for b in bases}
+
+    modelos_por_base = {
+        (b, m): df_resumo.index[(df_resumo.index.get_level_values('Base') == b) & (df_resumo.index.get_level_values('Modelo') == m)][0]
+        for b in bases
+        for m in dict.fromkeys(df_resumo.loc[b].index.get_level_values('Modelo'))
+    }
+    primeiras_linhas_modelo = set(modelos_por_base.values())
+
+    def _linha(r):
+        base, _, pol = r.name[0], r.name[1], r.name[2]
+        is_dest = (pol == politica_destaque)
+        bg = fundos_destaque.get(base, '#E5E7EB') if is_dest else fundos_normais.get(base, '#FFFFFF')
+        peso = '700' if is_dest else '500'
+        css = (
+            f"background-color: {bg}; "
+            f"color: #141414; "
+            f"font-weight: {peso}; "
+            f"border-bottom: 1px solid #D0D7DE; "
+            f"padding: 6px 10px;"
+        )
+        if r.name in primeiras_linhas and base != bases[0]:
+            css += ' border-top: 3px solid #1F2328;'
+        elif r.name in primeiras_linhas_modelo and r.name not in primeiras_linhas:
+            css += ' border-top: 2px solid #8C959F;'
+        return [css] * len(r)
+
+    def _cor_lucro(v):
+        cor = '#0B2545' if v >= 0 else '#5A6878'
+        return f"color: {cor}; font-weight: 800;"
+
+    def _cor_receita(_):
+        return "color: #0077B6; font-weight: 700;"
+
+    def _cor_perda(_):
+        return "color: #1B2633; font-weight: 600;"
+
+    cols_lucro = [c for c in ['Lucro Líquido', 'Lucro Treino (OOF)', 'Lucro Validação', 'Lucro Líquido Final (Unido)'] if c in df_resumo.columns]
+    cols_rec   = [c for c in ['Receita VN (+2%)'] if c in df_resumo.columns]
+    cols_perda = [c for c in ['Perda FP (−2%)', 'Chargeback FN (−100%)'] if c in df_resumo.columns]
+    cols_usd   = cols_lucro + cols_rec + cols_perda
+    cols_pct   = [c for c in ['Aceitação Geral', 'Aceitação de Pedidos', 'Aprovação', 'Aprovação (Legítimas)', 'Recall', 'Recall (Fraudes)', 'Precision'] if c in df_resumo.columns]
+
+    styler = df_resumo.style.apply(_linha, axis=1)
+    if cols_lucro:
+        styler = styler.map(_cor_lucro, subset=cols_lucro)
+    if cols_rec:
+        styler = styler.map(_cor_receita, subset=cols_rec)
+    if cols_perda:
+        styler = styler.map(_cor_perda, subset=cols_perda)
+
+    fmt_dict = {**{c: '$ {:,.0f}' for c in cols_usd}, **{c: '{:.1%}' for c in cols_pct}}
+    return (
+        styler
+        .format(fmt_dict)
+        .set_table_styles([
+            {'selector': 'th.col_heading', 'props': [('background-color', '#0B2545'), ('color', '#FFFFFF'), ('font-weight', '700'), ('text-align', 'right'), ('padding', '8px 10px'), ('border', '1px solid #13579B')]},
+            {'selector': 'th.index_name',  'props': [('background-color', '#0B2545'), ('color', '#FFFFFF'), ('font-weight', '700'), ('padding', '8px 10px'), ('border', '1px solid #13579B')]},
+            {'selector': 'th.row_heading', 'props': [('background-color', '#13579B'), ('color', '#F5F9FD'), ('font-weight', '700'), ('padding', '6px 10px'), ('border', '1px solid #2E86C1')]},
+            {'selector': 'td',             'props': [('text-align', 'right'), ('font-variant-numeric', 'tabular-nums')]},
+        ])
+    )
+
+
+def _plot_barras_politicas(df_politicas, base, politicas, coluna, escala, fmt_rotulo, ylabel, titulo,
+                           y_piso=None, figsize=(11.5, 5.8)):
+    """Barras por modelo (uma por política, do tom claro ao sólido na cor do modelo) para uma métrica de uma base."""
+    df_b = df_politicas.loc[base]
+    modelos = list(dict.fromkeys(df_b.index.get_level_values('Modelo')))
+    tons = ['clara', 'solida'] if len(politicas) == 2 else ['clara', 'media', 'solida'][:len(politicas)]
+    x = np.arange(len(modelos))
+    larg = 0.78 / len(politicas)
+
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.set_facecolor('#FCFCFD')
+    valores = []
+    for i, nome in enumerate(modelos):
+        cores = _cor_modelo(nome, i)
+        for j, pol in enumerate(politicas):
+            v = df_b.loc[(nome, pol), coluna] * escala
+            valores.append(v)
+            xp = x[i] + (j - (len(politicas) - 1) / 2) * larg
+            base_barra = y_piso if y_piso is not None else 0
+            ax.bar(
+                xp, v - base_barra, bottom=base_barra, width=larg * 0.88,
+                color=cores[tons[j]], edgecolor='#1F2328', linewidth=0.7, zorder=3
+            )
+            va = 'bottom' if v >= 0 else 'top'
+            ax.text(
+                xp, v, f"{fmt_rotulo(v)}\n({_ROTULO_CURTO_POLITICA.get(pol, pol)})",
+                ha='center', va=va, fontsize=9.8, fontweight='bold', color='#141414', zorder=5
+            )
+
+    if y_piso is None:
+        lo, hi = min(0, min(valores)), max(0, max(valores))
+        span = max(1.0, hi - lo)
+        ax.set_ylim(lo - 0.20 * span, hi + 0.25 * span)
+        ax.axhline(0, color='#1A1A1A', lw=1.0, zorder=2)
+    else:
+        hi = max(valores)
+        ax.set_ylim(y_piso, hi + 0.25 * (hi - y_piso))
+        ax.yaxis.set_major_formatter(ticker.PercentFormatter(xmax=100, decimals=0))
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(modelos, fontsize=11.5, fontweight='bold', color='#141414')
+    ax.set_ylabel(ylabel, fontsize=11, fontweight='bold', color='#333333', labelpad=10)
+    ax.set_title(titulo, fontsize=14, fontweight='heavy', loc='left', pad=15, color='#141414')
+    _estilo_limpo(ax)
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_lucro_politicas(
+    df_politicas: pd.DataFrame, base: str, politicas: List[str], titulo: str = '', figsize: tuple = (11, 6),
+):
+    """Lucro líquido total (US$ mil) de uma base, por modelo e política."""
+    _plot_barras_politicas(
+        df_politicas, base, politicas, coluna='Lucro Líquido', escala=1e-3,
+        fmt_rotulo=lambda v: f"US$ {v:+,.1f} mil", ylabel='Lucro líquido (US$ mil)',
+        titulo=titulo or f'Lucro líquido — {base}', figsize=figsize,
+    )
+
+
+def plot_aceitacao_politicas(
+    df_politicas: pd.DataFrame, base: str, politicas: List[str], titulo: str = '', figsize: tuple = (11, 6),
+):
+    """
+    Taxa de aceitação geral (% de TODAS as transações aprovadas, legítimas e fraudes) de uma base,
+    por modelo e política. O eixo Y começa abaixo do menor valor para as diferenças ficarem visíveis;
+    o piso usado é informado no rótulo do eixo.
+    """
+    vals = [df_politicas.loc[(base, m, p), 'Aceitação Geral'] * 100
+            for m in dict.fromkeys(df_politicas.loc[base].index.get_level_values('Modelo')) for p in politicas]
+    piso = max(0.0, np.floor((min(vals) - 4) / 5) * 5)
+    _plot_barras_politicas(
+        df_politicas, base, politicas, coluna='Aceitação Geral', escala=100,
+        fmt_rotulo=lambda v: f"{v:.1f}%", ylabel=f'Aceitação geral (%) — eixo a partir de {piso:.0f}%',
+        titulo=titulo or f'Taxa de aceitação geral — {base}', y_piso=piso, figsize=figsize,
+    )
+
+
+def plot_tradeoff_politicas(
+    df_politicas: pd.DataFrame, base: str, origem: str = 'Clássico 0.50', destino: str = 'Fixo Ótimo',
+    titulo: str = '', figsize: tuple = (10, 6.5),
+):
+    """
+    Trade-off operacional de uma base: Aprovação de legítimas (x) x Recall de fraudes (y).
+    Círculo vazado = política de origem; círculo cheio = política de destino; a seta mostra o deslocamento.
+    """
+    df_b = df_politicas.loc[base]
+    modelos = list(dict.fromkeys(df_b.index.get_level_values('Modelo')))
+    fig, ax = plt.subplots(figsize=figsize)
+
+    for i, nome in enumerate(modelos):
+        cor = _cor_modelo(nome, i)['solida']
+        a0, r0 = df_b.loc[(nome, origem), ['Aprovação', 'Recall']] * 100
+        a1, r1 = df_b.loc[(nome, destino), ['Aprovação', 'Recall']] * 100
+        ax.annotate('', xy=(a1, r1), xytext=(a0, r0),
+                    arrowprops=dict(arrowstyle='->', color=cor, lw=1.8, shrinkA=8, shrinkB=8))
+        ax.scatter(a0, r0, s=140, facecolor='white', edgecolor=cor, linewidth=2.2, zorder=5)
+        ax.scatter(a1, r1, s=140, color=cor, edgecolor='white', linewidth=1.5, zorder=5, label=nome)
+        for xa, ya, pol, peso, dy in [(a0, r0, origem, 'normal', 16), (a1, r1, destino, 'bold', -16)]:
+            ax.annotate(f"{pol}\naprov. {xa:.1f}% · recall {ya:.1f}%", xy=(xa, ya), xytext=(0, dy),
+                        textcoords='offset points', ha='center', va='bottom' if dy > 0 else 'top',
+                        fontsize=9.5, color=cor, fontweight=peso)
+
+    ax.margins(x=0.25, y=0.25)
+    ax.set_xlabel('Aprovação de legítimas (%)  →  menos atrito com o cliente', fontsize=11)
+    ax.set_ylabel('Recall de fraudes (%)  →  mais fraude barrada', fontsize=11)
+    ax.set_title(titulo or f'Aprovação x captura de fraude — {base}', fontsize=14, fontweight='bold', loc='left', pad=12)
+    ax.grid(ls=':', alpha=0.5)
+    ax.legend(frameon=False, fontsize=10, loc='lower left')
+    _limpar_bordas(ax)
+    plt.tight_layout()
+    plt.show()
+
+
+def tabela_risco_inerente(particoes: Dict[str, pd.DataFrame], col_target: str = 'isFraud') -> pd.DataFrame:
+    """
+    Calcula a DRE (Demonstrativo de Resultado) teórica assumindo que a empresa
+    aprovasse 100% ou bloqueasse 100% das transações, sem usar nenhum modelo.
+    """
+    linhas = []
+    for nome, df in particoes.items():
+        # Valores reais em US$ (reverte log1p se necessário)
+        amt = obter_amt_real(df)
+        y = df[col_target].values
+
+        vol_legit = float(amt[y == 0].sum())
+        vol_fraud = float(amt[y == 1].sum())
+
+        linhas.append({
+            'Base': nome,
+            'Transações': len(y),
+            'Taxa Fraude': y.mean(),
+            'Volume Legítimo (US$)': vol_legit,
+            'Volume Fraude (US$)': vol_fraud,
+            'Receita Potencial (+2%)': vol_legit * 0.02,
+            'Prejuízo Inerente (-100%)': vol_fraud,
+            'LUCRO: Aprovar 100%': (vol_legit * 0.02) - vol_fraud,
+            'LUCRO: Bloquear 100%': -(vol_legit * 0.02),
+        })
+
+    df_res = pd.DataFrame(linhas)
+
+    # Linha de Total
+    total = df_res.sum(numeric_only=True)
+    total['Base'] = 'TOTAL'
+    total['Taxa Fraude'] = (df_res['Taxa Fraude'] * df_res['Transações']).sum() / df_res['Transações'].sum()
+    df_res = pd.concat([df_res, total.to_frame().T], ignore_index=True)
+
+    return df_res
+
+
+def plot_dilema_financeiro(df_tabela: pd.DataFrame, figsize: tuple = (12, 4.5)):
+    """
+    Plota as barras contrapostas do cenário base com rótulos de dados diretos,
+    com limites simétricos forçados para evitar sobreposição de texto.
+    """
+    # Isola a linha de TOTAL da tabela
+    tot = df_tabela[df_tabela['Base'] == 'TOTAL'].iloc[0]
+    
+    receita = tot['Receita Potencial (+2%)'] / 1e6
+    prejuizo = tot['Prejuízo Inerente (-100%)'] / 1e6
+    lucro_aprov = tot['LUCRO: Aprovar 100%'] / 1e6
+    lucro_bloq = tot['LUCRO: Bloquear 100%'] / 1e6
+    
+    fig, ax = plt.subplots(figsize=figsize)
+    
+    y_pos = [1.2, 0] # Espaçamento vertical entre cenários
+    labels = [
+        f"CENÁRIO 1: Aprovar 100%\nLucro Líquido: -US$ {abs(lucro_aprov):.2f} Mi", 
+        f"CENÁRIO 2: Bloquear 100%\nLucro Líquido: -US$ {abs(lucro_bloq):.2f} Mi"
+    ]
+    
+    altura_barra = 0.45
+    ax.barh(y_pos[0], receita, color='#0096C7', height=altura_barra, label='Receita Potencial (+2% Legítimas)')
+    ax.barh(y_pos[0], -prejuizo, color='#0B2545', height=altura_barra, label='Chargeback Fraude (-100%)')
+    ax.barh(y_pos[1], -receita, color='#5DADE2', height=altura_barra, label='Asfixia Comercial (Falsos Positivos)')
+    
+    # Linha central âncora
+    ax.axvline(0, color='#1A1A1A', lw=2)
+    
+    # ==========================================================================
+    # CORREÇÃO DE ESPAÇAMENTO: Limites simétricos dinâmicos
+    # ==========================================================================
+    max_val = max(receita, prejuizo)
+    ax.set_xlim(-max_val * 1.4, max_val * 1.4) # Adiciona 40% de margem nas laterais
+    offset = max_val * 0.03 # Afastamento relativo para os rótulos de dados
+    
+    # Rótulos de dados cravados nas pontas das barras
+    ax.text(receita + offset, y_pos[0], f"+US$ {receita:.2f}M", va='center', ha='left', color='#0096C7', fontweight='bold', fontsize=11)
+    ax.text(-prejuizo - offset, y_pos[0], f"-US$ {prejuizo:.2f}M", va='center', ha='right', color='#0B2545', fontweight='bold', fontsize=11)
+    ax.text(-receita - offset, y_pos[1], f"-US$ {receita:.2f}M", va='center', ha='right', color='#2E86C1', fontweight='bold', fontsize=11)
+    
+    # Formatação dos eixos e títulos
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(labels, fontweight='bold', fontsize=11)
+    ax.set_xticks([])  # Removemos os números do eixo X
+    
+    # Afasta os labels do eixo Y para não colidirem com os números vermelhos
+    ax.tick_params(axis='y', pad=15)
+    
+    ax.set_title("O Problema de Negócio (Risco Inerente Total)", loc='left', fontweight='heavy', fontsize=14, pad=20)
+    
+    # Legenda alinhada e discreta
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05), ncol=3, frameon=False, fontsize=10)
+    
+    # Remoção de TODAS as bordas (Spines)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+        
+    plt.tight_layout()
+    plt.show()
+
+def avaliar_politicas_por_bloco(y_true, amt, blocos, politicas: Dict[str, Any], rotulo_bloco: str = 'Mês') -> pd.DataFrame:
+    """
+    Score financeiro de cada política de bloqueio (dict nome -> máscara booleana de bloqueio)
+    em cada bloco temporal e no total do período.
+    """
+    y_true = np.asarray(y_true)
+    amt = np.asarray(amt, dtype=float)
+    blocos = np.asarray(blocos)
+    linhas = []
+    for b in list(np.unique(blocos)) + ['Total']:
+        msk = np.ones(len(y_true), dtype=bool) if b == 'Total' else (blocos == b)
+        for nome, bloqueio in politicas.items():
+            r = calcular_score_financeiro(y_true[msk], np.asarray(bloqueio, dtype=bool)[msk], amt[msk])
+            linhas.append({
+                'Bloco': 'Total' if b == 'Total' else f'{rotulo_bloco} {b}',
+                'Politica': nome,
+                'Lucro': r['Resultado_Liquido'],
+                'Receita_VN': r['Receita_VN'],
+                'Penalidade_FP': r['Penalidade_FP'],
+                'Prejuizo_FN': r['Prejuizo_FN'],
+                'Aprovacao': r['Approval_Rate'],
+                'Recall': r['Recall'],
+                'Precision': r['Precision'],
+            })
+    return pd.DataFrame(linhas)
+
+
+def plot_estabilidade_temporal(df_blocos: pd.DataFrame, titulo: str = '', figsize: tuple = (18, 5.4)):
+    """
+    Painel triplo de estabilidade mensal (exclui a linha Total):
+      (1) Resultado Líquido das Políticas Ativas (US$ Mil) com rótulos diretos (anotando o prejuízo Sem Modelo);
+      (2) Recall de Fraudes Bloqueadas (%) por bloco com rótulos diretos;
+      (3) Aprovação de Legítimas (%) por bloco com escala ajustada e rótulos diretos.
+    """
+    df_plot = df_blocos[df_blocos['Bloco'] != 'Total'].copy()
+    blocos = list(dict.fromkeys(df_plot['Bloco']))
+    politicas_todas = list(dict.fromkeys(df_plot['Politica']))
+
+    # Separa "Sem Modelo" no gráfico de Lucro se o prejuízo for muito discrepante, para não esmagar as barras dos modelos
+    pols_modelos = [p for p in politicas_todas if p != 'Sem Modelo']
+    usar_foco_modelos = len(pols_modelos) >= 2 and ('Sem Modelo' in politicas_todas)
+
+    mapa_cores = {
+        'Sem Modelo': '#97A3B0',
+        'Clássico 0.50': '#5DADE2',
+        'Fixo Ótimo': '#0096C7',
+        'Dinâmico (Optuna)': '#0B2545',
+    }
+    for idx_c, p in enumerate(politicas_todas):
+        if p not in mapa_cores:
+            mapa_cores[p] = _PALETA_POLITICAS[idx_c % len(_PALETA_POLITICAS)]
+
+    x = np.arange(len(blocos))
+    fig, axes = plt.subplots(1, 3, figsize=figsize)
+
+    # --- Painel 1: Resultado Líquido por Mês (US$ Mil) ---
+    pols_p1 = pols_modelos if usar_foco_modelos else politicas_todas
+    larg_p1 = 0.76 / max(1, len(pols_p1))
+    vals_p1 = []
+    for i, pol in enumerate(pols_p1):
+        d = df_plot[df_plot['Politica'] == pol].set_index('Bloco').loc[blocos]
+        y_k = d['Lucro'].values / 1e3
+        vals_p1.extend(y_k)
+        pos = x + (i - (len(pols_p1) - 1) / 2) * larg_p1
+        bars = axes[0].bar(pos, y_k, width=larg_p1 * 0.92, color=mapa_cores[pol], label=pol)
+        for bar, val in zip(bars, y_k):
+            va = 'bottom' if val >= 0 else 'top'
+            axes[0].text(
+                bar.get_x() + bar.get_width() / 2,
+                val + (0.8 if val >= 0 else -0.8),
+                f"${val:+,.1f}k",
+                ha='center', va=va, fontsize=8.6, fontweight='bold', color='#1A1A1A'
+            )
+
+    axes[0].axhline(0, color='#1A1A1A', lw=1.0)
+    if vals_p1:
+        ymin1, ymax1 = min(0.0, min(vals_p1)), max(0.0, max(vals_p1))
+        span1 = max(5.0, ymax1 - ymin1)
+        axes[0].set_ylim(ymin1 - 0.25 * span1, ymax1 + 0.30 * span1)
+
+    if usar_foco_modelos:
+        d_sem = df_plot[df_plot['Politica'] == 'Sem Modelo'].set_index('Bloco').loc[blocos]
+        resumo_sem = " | ".join([f"{b}: -US$ {abs(v)/1e3:,.0f}k" for b, v in zip(blocos, d_sem['Lucro'].values)])
+        axes[0].text(
+            0.02, 0.96, f"Ref. Sem Modelo (Aprovar 100%): {resumo_sem}",
+            transform=axes[0].transAxes, ha='left', va='top', fontsize=8.3, fontweight='bold', color='#555555',
+            bbox=dict(boxstyle='round,pad=0.3', facecolor='#F5F5F5', edgecolor='#BDBDBD', alpha=0.92)
+        )
+
+    axes[0].set_xticks(x)
+    axes[0].set_xticklabels(blocos, fontweight='bold')
+    axes[0].set_title('1. Resultado Líquido por Mês (Modelos)', fontsize=11.5, fontweight='bold', loc='left')
+    axes[0].set_ylabel('US$ Mil')
+    axes[0].grid(axis='y', linestyle=':', alpha=0.5)
+    axes[0].legend(frameon=False, fontsize=8.8, loc='lower right')
+    _limpar_bordas(axes[0])
+
+    # --- Painel 2: Recall de Fraudes Bloqueadas (%) ---
+    pols_p2 = pols_modelos if usar_foco_modelos else politicas_todas
+    larg_p2 = 0.76 / max(1, len(pols_p2))
+    vals_p2 = []
+    for i, pol in enumerate(pols_p2):
+        d = df_plot[df_plot['Politica'] == pol].set_index('Bloco').loc[blocos]
+        y_rec = d['Recall'].values * 100
+        vals_p2.extend(y_rec)
+        pos = x + (i - (len(pols_p2) - 1) / 2) * larg_p2
+        bars = axes[1].bar(pos, y_rec, width=larg_p2 * 0.92, color=mapa_cores[pol], label=pol)
+        for bar, val in zip(bars, y_rec):
+            axes[1].text(bar.get_x() + bar.get_width() / 2, val + 0.8, f"{val:.1f}%",
+                         ha='center', va='bottom', fontsize=8.6, fontweight='bold', color='#1A1A1A')
+
+    if vals_p2:
+        min_r = max(0.0, min(vals_p2) - 12.0)
+        axes[1].set_ylim(min_r, min(105.0, max(vals_p2) + 10.0))
+    axes[1].set_xticks(x)
+    axes[1].set_xticklabels(blocos, fontweight='bold')
+    axes[1].set_title('2. Recall (Fraudes Bloqueadas %)', fontsize=11.5, fontweight='bold', loc='left')
+    axes[1].set_ylabel('Recall (%)')
+    axes[1].grid(axis='y', linestyle=':', alpha=0.5)
+    axes[1].legend(frameon=False, fontsize=8.8, loc='lower right')
+    _limpar_bordas(axes[1])
+
+    # --- Painel 3: Taxa de Aprovação de Legítimas (%) ---
+    larg_p3 = 0.78 / max(1, len(politicas_todas))
+    vals_p3 = []
+    for i, pol in enumerate(politicas_todas):
+        d = df_plot[df_plot['Politica'] == pol].set_index('Bloco').loc[blocos]
+        y_apr = d['Aprovacao'].values * 100
+        vals_p3.extend(y_apr)
+        pos = x + (i - (len(politicas_todas) - 1) / 2) * larg_p3
+        bars = axes[2].bar(pos, y_apr, width=larg_p3 * 0.92, color=mapa_cores[pol], label=pol)
+        for bar, val in zip(bars, y_apr):
+            axes[2].text(bar.get_x() + bar.get_width() / 2, val + 0.5, f"{val:.1f}%",
+                         ha='center', va='bottom', fontsize=8.3, fontweight='bold', color='#1A1A1A')
+
+    if vals_p3:
+        min_a = max(0.0, min(vals_p3) - 6.0)
+        axes[2].set_ylim(min_a, 104.5)
+    axes[2].set_xticks(x)
+    axes[2].set_xticklabels(blocos, fontweight='bold')
+    axes[2].set_title('3. Aprovação de Legítimas (%)', fontsize=11.5, fontweight='bold', loc='left')
+    axes[2].set_ylabel('Aprovação (%)')
+    axes[2].grid(axis='y', linestyle=':', alpha=0.5)
+    axes[2].legend(frameon=False, fontsize=8.5, loc='lower right')
+    _limpar_bordas(axes[2])
+
+    if titulo:
+        fig.suptitle(titulo, fontsize=13, fontweight='bold', x=0.01, ha='left', y=1.02)
+    plt.tight_layout()
+    plt.show()
+
+
+# ------------------------------------------------------------------------------
+# THRESHOLD DINÂMICO POR TICKET (VP=0, VN=+0.02, FP=-0.02, FN=-1.0)
+# ------------------------------------------------------------------------------
+def calcular_matriz_lucro(y_true, prob, threshold_array, amt):
+    """Função de lucro estrita (Matriz: VP=0, VN=0.02, FP=-0.02, FN=-1.0) para threshold fixo ou vetorizado."""
+    y_true = np.asarray(y_true)
+    amt = np.asarray(amt, dtype=float)
+    bloqueado = np.asarray(prob) >= threshold_array
+    aprovado = ~bloqueado
+
+    vn = aprovado  & (y_true == 0)
+    fp = bloqueado & (y_true == 0)
+    fn = aprovado  & (y_true == 1)
+
+    receita_vn  = (0.02 * amt[vn]).sum()
+    penal_fp    = (0.02 * amt[fp]).sum()
+    prejuizo_fn = (1.00 * amt[fn]).sum()
+
+    lucro_liquido = receita_vn - penal_fp - prejuizo_fn
+
+    return {
+        'Lucro': lucro_liquido,
+        'Aprovacao': vn.sum() / max(1, (y_true == 0).sum()),
+        'Recall': (bloqueado & (y_true == 1)).sum() / max(1, (y_true == 1).sum())
+    }
+
+
+def threshold_dinamico(amt, t_min, t_max, k):
+    """Curva de threshold por ticket: decai de t_max (micro-compras) até t_min (alto ticket)."""
+    return t_min + (t_max - t_min) * np.exp(-k * np.asarray(amt, dtype=float))
+
+
+def objective_threshold_dinamico(trial, y_true, probs, amt):
+    """Função objetivo Optuna: maximiza o lucro do threshold dinâmico no OOF calibrado."""
+    t_max = trial.suggest_float('t_max', 0.05, 0.35)           # Teto para tickets muito baixos
+    t_min = trial.suggest_float('t_min', 0.005, t_max - 0.01)  # Piso para tickets altos (sempre menor que t_max)
+    k     = trial.suggest_float('k', 0.001, 0.05, log=True)    # Taxa de queda
+
+    th = threshold_dinamico(amt, t_min, t_max, k)
+    return calcular_matriz_lucro(y_true, probs, th, amt)['Lucro']
+
+
+def plot_curva_threshold_dinamico(
+    th_dinamico: Dict[str, Dict[str, float]],
+    threshold_otimo: Dict[str, float],
+    nome_modelo: Optional[str] = None,
+    amt_max: float = 1500,
+    titulo: str = '',
+    figsize: Optional[tuple] = None,
+):
+    """
+    Gráfico limpo e minimalista da curva de threshold dinâmico por valor da transação.
+    Se `nome_modelo` for informado, plota apenas aquele modelo; caso contrário, plota lado a lado.
+    """
+    nomes = [nome_modelo] if nome_modelo is not None else list(th_dinamico.keys())
+    n_mod = len(nomes)
+    figsize = figsize or ((11, 4.6) if n_mod == 1 else (7.5 * n_mod, 4.6))
+    eixo_amt = np.linspace(0, amt_max, 400)
+
+    fig, axes = plt.subplots(1, n_mod, figsize=figsize, sharey=True)
+    if n_mod == 1:
+        axes = [axes]
+
+    max_y_value = max(max(d['t_max'], threshold_otimo.get(n, 0.0)) for n, d in th_dinamico.items())
+    y_top = max_y_value * 1.18
+
+    for i, (ax, nome) in enumerate(zip(axes, nomes)):
+        d = th_dinamico[nome]
+        th_fixo = float(threshold_otimo[nome])
+        cor = _cor_modelo(nome, i)['solida']
+        curva = threshold_dinamico(eixo_amt, d['t_min'], d['t_max'], d['k'])
+        th_fim = float(curva[-1])
+
+        ax.set_xlim(0, amt_max)
+        ax.set_ylim(0, y_top)
+
+        # Sombreado leve na zona de aprovação (abaixo da curva)
+        ax.fill_between(eixo_amt, 0, curva, color=cor, alpha=0.05, lw=0)
+
+        # Curva dinâmica + linhas de referência (informações na legenda, sem caixas no meio do gráfico)
+        ax.plot(eixo_amt, curva, color=cor, lw=2.8,
+                label=f'Curva Dinâmica ({d["t_max"]:.2%} → {d["t_min"]:.2%})')
+        ax.axhline(th_fixo, color='#555555', ls='--', lw=1.5,
+                   label=f'Fixo Ótimo ({th_fixo:.2%})')
+        ax.axhline(d['t_min'], color='#999999', ls=':', lw=1.2,
+                   label=f'Assíntota Alto Ticket ({d["t_min"]:.2%})')
+
+        # Apenas marcadores discretos nas extremidades
+        ax.scatter([0, amt_max], [d['t_max'], th_fim], color=cor, s=55, edgecolor='white', linewidth=1.5, zorder=5)
+        ax.annotate(f"{d['t_max']:.2%}", xy=(0, d['t_max']), xytext=(8, 4), textcoords='offset points',
+                    fontsize=9.5, fontweight='bold', color=cor, ha='left', va='bottom')
+        ax.annotate(f"{th_fim:.2%}", xy=(amt_max, th_fim), xytext=(-8, 6), textcoords='offset points',
+                    fontsize=9.5, fontweight='bold', color=cor, ha='right', va='bottom')
+
+        ax.yaxis.set_major_formatter(ticker.PercentFormatter(xmax=1, decimals=1))
+        ax.xaxis.set_major_formatter(ticker.StrMethodFormatter('US$ {x:,.0f}'))
+        ax.set_xlabel('Valor da transação (US$)', fontsize=11, color='#333333', labelpad=8)
+        if i == 0:
+            ax.set_ylabel('Threshold de bloqueio exigido', fontsize=11, color='#333333', labelpad=8)
+        else:
+            ax.set_ylabel('')
+            ax.tick_params(labelleft=True)
+
+        ax.set_title(
+            titulo if (titulo and n_mod == 1) else f'Threshold Dinâmico vs. Fixo — {nome}',
+            fontsize=13, fontweight='heavy', loc='left', pad=12, color='#1A1A1A',
+        )
+        ax.legend(frameon=False, fontsize=9.5, loc='upper right')
+        _estilo_limpo(ax)
+
+    if titulo and n_mod > 1:
+        fig.suptitle(titulo, fontsize=13.5, fontweight='heavy', x=0.01, ha='left', y=1.02, color='#1A1A1A')
+    plt.tight_layout()
+    plt.show()
+
+
+def tabela_consolidada_treino_validacao(
+    y_train, amt_train, politicas_treino: Dict[str, Dict[str, np.ndarray]],
+    y_val, amt_val, politicas_val: Dict[str, Dict[str, np.ndarray]],
+) -> pd.DataFrame:
+    """
+    Constrói a tabela final da Seção 7.4 unindo Treino (OOF) + Validação para LGBM_Max e LGBM_Otimizado
+    nas 4 políticas (Sem Algoritmo / Risco, Clássico 0.50, Fixo Ótimo e Dinâmico Optuna), exibindo:
+      - Lucro no Treino (OOF), Lucro na Validação e Lucro Líquido Final (Unido);
+      - Receita VN (+2%), Perda FP (−2%) e Chargeback FN (−100%) acumulados;
+      - Aceitação de Pedidos (% geral de pedidos aceitos), Aprovação (Legítimas), Recall e Precision.
+    """
+    y_tr_arr, amt_tr_arr = np.asarray(y_train), np.asarray(amt_train, dtype=float)
+    y_va_arr, amt_va_arr = np.asarray(y_val),   np.asarray(amt_val, dtype=float)
+    y_unido   = np.concatenate([y_tr_arr, y_va_arr])
+    amt_unido = np.concatenate([amt_tr_arr, amt_va_arr])
+
+    nomes_exibicao = {
+        'Sem Modelo': 'Sem Algoritmo / Risco',
+        'Clássico 0.50': 'Corte 0.50',
+        'Fixo Ótimo': 'Fixo Ótimo',
+        'Dinâmico (Optuna)': 'Dinâmico (Optuna)',
+    }
+
+    linhas = []
+    for nome in politicas_treino.keys():
+        for pol_chave in politicas_treino[nome].keys():
+            bloq_tr = np.asarray(politicas_treino[nome][pol_chave], dtype=bool)
+            bloq_va = np.asarray(politicas_val[nome][pol_chave], dtype=bool)
+            bloq_un = np.concatenate([bloq_tr, bloq_va])
+
+            r_tr = calcular_score_financeiro(y_tr_arr, bloq_tr, amt_tr_arr)
+            r_va = calcular_score_financeiro(y_va_arr, bloq_va, amt_va_arr)
+            r_un = calcular_score_financeiro(y_unido,  bloq_un, amt_unido)
+
+            linhas.append({
+                'Base': 'Treino + Validação (Unido)',
+                'Modelo': nome,
+                'Política': nomes_exibicao.get(pol_chave, pol_chave),
+                'Lucro Treino (OOF)': r_tr['Resultado_Liquido'],
+                'Lucro Validação': r_va['Resultado_Liquido'],
+                'Lucro Líquido Final (Unido)': r_un['Resultado_Liquido'],
+                'Receita VN (+2%)': r_un['Receita_VN'],
+                'Perda FP (−2%)': r_un['Penalidade_FP'],
+                'Chargeback FN (−100%)': r_un['Prejuizo_FN'],
+                'Aceitação de Pedidos': 1.0 - (r_un['Qtd_VP'] + r_un['Qtd_FP']) / max(1, len(bloq_un)),
+                'Aprovação (Legítimas)': r_un['Approval_Rate'],
+                'Recall (Fraudes)': r_un['Recall'],
+                'Precision': r_un['Precision'],
+            })
+
+    return pd.DataFrame(linhas).set_index(['Base', 'Modelo', 'Política'])
+
+
+# ------------------------------------------------------------------------------
+# MODELO FINAL (SEÇÃO 8): ARTEFATO, REGRA DINÂMICA, AVALIAÇÃO E EXPORTAÇÃO
+# ------------------------------------------------------------------------------
+def montar_artefato_final(
+    nome_modelo: str, modelo, calibrador, features: List[str],
+    params_dinamico: Dict[str, float], threshold_fixo_ref: Optional[float] = None,
+    n_amostras_treino: Optional[int] = None,
+) -> Dict[str, Any]:
+    """
+    Empacota tudo o que a inferência precisa em um único objeto serializável:
+    estimador (treinado em 100% do Treino), calibrador isotônico, lista de features e parâmetros da regra dinâmica.
+    """
+    return {
+        'nome_modelo': nome_modelo,
+        'modelo': modelo,
+        'calibrador': calibrador,
+        'features': list(features),
+        'treinado_100pct_treino': True,
+        'n_amostras_treino': None if n_amostras_treino is None else int(n_amostras_treino),
+        'regra_decisao': {
+            'tipo': 'threshold_dinamico',
+            'formula': 'bloquear se prob_calibrada >= t_min + (t_max - t_min) * exp(-k * TransactionAmt_USD)',
+            't_min': float(params_dinamico['t_min']),
+            't_max': float(params_dinamico['t_max']),
+            'k': float(params_dinamico['k']),
+            'lucro_oof_optuna': None if 'lucro_oof' not in params_dinamico else float(params_dinamico['lucro_oof']),
+            'threshold_fixo_referencia': None if threshold_fixo_ref is None else float(threshold_fixo_ref),
+        },
+    }
+
+
+def aplicar_regra_dinamica(artefato: Dict[str, Any], X, amt_real) -> Dict[str, np.ndarray]:
+    """
+    Inferência com o artefato final: probabilidade bruta -> calibrada -> corte por valor -> decisão.
+    `amt_real` é o valor da transação em US$ reais (não em log).
+    """
+    X_ = X[artefato['features']] if hasattr(X, 'columns') else X
+    regra = artefato['regra_decisao']
+    prob_raw = artefato['modelo'].predict_proba(X_)[:, 1]
+    prob_cal = artefato['calibrador'].transform(prob_raw)
+    th = threshold_dinamico(amt_real, regra['t_min'], regra['t_max'], regra['k'])
+    return {'prob_raw': prob_raw, 'prob_cal': prob_cal, 'threshold': th, 'bloquear': prob_cal >= th}
+
+
+# (rótulo, chave, tipo, mostra gap) — o gap só faz sentido para métricas que não dependem do tamanho da base
+_LAYOUT_AVALIACAO_FINAL = {
+    'METRICAS INDEPENDENTES DO THRESHOLD (Probabilidade bruta)': [
+        ('ROC-AUC', 'ROC-AUC', 'prob', True),
+        ('GINI', 'GINI', 'prob', True),
+        ('PR-AUC', 'PR-AUC', 'prob', True),
+        ('KS', 'KS', 'prob', True),
+    ],
+    'METRICAS DA REGRA DE DECISAO (Threshold dinâmico)': [
+        ('Precision', 'Precision', 'pct', True),
+        ('Recall', 'Recall', 'pct', True),
+        ('F1-Score', 'F1-Score', 'prob', True),
+        ('Aprovação Legítimas', 'Aprovação', 'pct', True),
+        ('Aceitação Geral', 'Aceitação Geral', 'pct', True),
+        ('Fraudes Barradas (VP)', 'Qtd_VP', 'int', False),
+        ('Legítimas Bloq. (FP)', 'Qtd_FP', 'int', False),
+        ('Fraudes Aprovadas (FN)', 'Qtd_FN', 'int', False),
+    ],
+    'RESULTADO FINANCEIRO (US$)': [
+        ('Receita VN (+2%)', 'Receita VN', 'usd', False),
+        ('Perda FP (-2%)', 'Perda FP', 'usd', False),
+        ('Chargeback FN (-100%)', 'Chargeback FN', 'usd', False),
+        ('Lucro Líquido', 'Lucro Líquido', 'usd', False),
+        ('Lucro Sem Modelo (ref.)', 'Lucro Sem Modelo', 'usd', False),
+        ('Lucro por Transação', 'Lucro por Transação', 'usd3', True),
+        ('Margem s/ Volume', 'Margem s/ Volume', 'pct', True),
+    ],
+}
+
+
+def _metricas_particao_unica(y, prob_raw, bloquear, amt) -> Dict[str, float]:
+    """Calcula métricas estatísticas, operacionais e financeiras em um único vetor/partição."""
+    from sklearn.metrics import roc_auc_score, average_precision_score, f1_score
+    y = np.asarray(y).astype(int)
+    prob_raw = np.asarray(prob_raw, dtype=float)
+    bloquear = np.asarray(bloquear, dtype=bool)
+    amt = np.asarray(amt, dtype=float)
+
+    roc = roc_auc_score(y, prob_raw) if len(np.unique(y)) > 1 else 0.0
+    pr  = average_precision_score(y, prob_raw) if len(np.unique(y)) > 1 else 0.0
+    ks  = ks_2samp(prob_raw[y == 1], prob_raw[y == 0]).statistic if (y == 1).any() and (y == 0).any() else 0.0
+    r = calcular_score_financeiro(y, bloquear, amt)
+    r_sem = calcular_score_financeiro(y, np.zeros(len(y), dtype=bool), amt)
+    return {
+        'Transações': int(len(y)),
+        'Taxa Fraude': float(y.mean()),
+        'ROC-AUC': float(roc),
+        'GINI': float(2 * roc - 1),
+        'PR-AUC': float(pr),
+        'KS': float(ks),
+        'Precision': float(r['Precision']),
+        'Recall': float(r['Recall']),
+        'F1-Score': float(f1_score(y, bloquear.astype(int), zero_division=0)),
+        'Aprovação': float(r['Approval_Rate']),
+        'Aceitação Geral': float(1 - (r['Qtd_VP'] + r['Qtd_FP']) / max(1, len(y))),
+        'Qtd_VP': int(r['Qtd_VP']), 'Qtd_FP': int(r['Qtd_FP']), 'Qtd_FN': int(r['Qtd_FN']), 'Qtd_VN': int(r['Qtd_VN']),
+        'Receita VN': float(r['Receita_VN']),
+        'Perda FP': float(r['Penalidade_FP']),
+        'Chargeback FN': float(r['Prejuizo_FN']),
+        'Lucro Líquido': float(r['Resultado_Liquido']),
+        'Lucro Sem Modelo': float(r_sem['Resultado_Liquido']),
+        'Lucro por Transação': float(r['Resultado_Liquido'] / max(1, len(y))),
+        'Margem s/ Volume': float(r['Resultado_Liquido'] / max(1.0, amt.sum())),
+    }
+
+
+def _metricas_modelo_final(y, prob_raw, bloquear, amt, groups=None) -> Dict[str, float]:
+    """
+    Métricas de ranqueamento, da regra de decisão e financeiras de uma base.
+    Se `groups` for informado (ex.: blocos do CV no Treino), as métricas relativas/taxas
+    (ROC-AUC, GINI, PR-AUC, KS, Precision, Recall, F1, Aprovação, Aceitação, Lucro/Tx e Margem)
+    são calculadas como a MÉDIA DOS TESTES DO CV, mantendo os volumes totais somados no OOF.
+    """
+    base_global = _metricas_particao_unica(y, prob_raw, bloquear, amt)
+    if groups is None:
+        return base_global
+
+    y_arr = np.asarray(y).astype(int)
+    p_arr = np.asarray(prob_raw, dtype=float)
+    b_arr = np.asarray(bloquear, dtype=bool)
+    a_arr = np.asarray(amt, dtype=float)
+    g_arr = np.asarray(groups)
+
+    gkf = GroupKFold(n_splits=min(4, len(np.unique(g_arr))))
+    metricas_folds = []
+    for _, va_idx in gkf.split(p_arr, y_arr, groups=g_arr):
+        if len(np.unique(y_arr[va_idx])) > 1:
+            metricas_folds.append(_metricas_particao_unica(y_arr[va_idx], p_arr[va_idx], b_arr[va_idx], a_arr[va_idx]))
+
+    if not metricas_folds:
+        return base_global
+
+    chaves_media_cv = [
+        'ROC-AUC', 'GINI', 'PR-AUC', 'KS',
+        'Precision', 'Recall', 'F1-Score', 'Aprovação', 'Aceitação Geral',
+        'Lucro por Transação', 'Margem s/ Volume',
+    ]
+    for k in chaves_media_cv:
+        base_global[k] = float(np.mean([m[k] for m in metricas_folds]))
+    return base_global
+
+
+def avaliar_modelo_final(artefato: Dict[str, Any], bases: Dict[str, Dict[str, Any]]) -> pd.DataFrame:
+    """
+    Avaliação final do modelo campeão com a regra dinâmica (sem tocar no OOT):
+      - `Treino (Teste CV)`: média dos folds de teste do CV no Treino (e totais OOF);
+      - `Validação`: base isolada de validação (`df_validacao`);
+      - `Gap (Val - CV)`: diferença entre Validação e Treino (Teste CV).
+    Retorna um DataFrame com as colunas das bases e a coluna `Gap (Val - CV)`.
+    """
+    regra = artefato['regra_decisao']
+    metricas = {}
+    for nome_base, b in bases.items():
+        th = threshold_dinamico(b['amt'], regra['t_min'], regra['t_max'], regra['k'])
+        bloquear = np.asarray(b['prob_cal']) >= th
+        metricas[nome_base] = _metricas_modelo_final(
+            b['y'], b['prob_raw'], bloquear, b['amt'], groups=b.get('groups')
+        )
+    df = pd.DataFrame(metricas)
+
+    nomes = list(bases)
+    ref, alvo = (nomes[-2], nomes[-1]) if len(nomes) >= 2 else (nomes[0], nomes[0])
+    col_gap = 'Gap (Val - CV)' if len(nomes) == 2 else f'Gap ({alvo} - {ref[:3]})'
+    df[col_gap] = df[alvo] - df[ref]
+
+    chaves_sem_gap = {
+        chave for linhas in _LAYOUT_AVALIACAO_FINAL.values()
+        for _, chave, _, tem_gap in linhas if not tem_gap
+    } | {'Transações'}
+    for ch in chaves_sem_gap:
+        if ch in df.index:
+            df.loc[ch, col_gap] = np.nan
+
+    larg = 26 + 20 * (len(nomes) + 1)
+
+    def _fmt(v, tipo):
+        return {'prob': f"{v:.4f}", 'pct': f"{v:.2%}", 'int': f"{v:,.0f}",
+                'usd': f"$ {v:,.0f}", 'usd3': f"$ {v:,.3f}"}[tipo]
+
+    def _fmt_gap(v, tipo):
+        if pd.isna(v):
+            return '-'
+        return {'prob': f"{v:+.4f}", 'pct': f"{v * 100:+.2f} p.p.", 'usd3': f"$ {v:+,.3f}"}.get(tipo, '-')
+
+    print('=' * larg)
+    print(f" MODELO FINAL: {artefato['nome_modelo'].upper()} | {len(artefato['features'])} features | Threshold dinâmico")
+    print(f" Regra: bloquear se prob. calibrada >= {regra['t_min']:.4f} + ({regra['t_max']:.4f} - {regra['t_min']:.4f}) · exp(-{regra['k']:.5f} · Valor US$)")
+    print('-' * larg)
+    print(" Taxa Base de Fraude (Target=1): " + " | ".join(
+        f"{n} = {df.loc['Taxa Fraude', n]:.2%} ({int(df.loc['Transações', n]):,} tx)" for n in nomes))
+    print('-' * larg)
+
+    cab = f" {'Metrica':<24}" + "".join(f" | {n:>18}" for n in nomes) + f" | {col_gap:>16}"
+    for bloco, linhas in _LAYOUT_AVALIACAO_FINAL.items():
+        print(f"\n [ {bloco} ]")
+        print(cab)
+        print('-' * len(cab))
+        for rotulo, chave, tipo, gap in linhas:
+            vals = "".join(f" | {_fmt(df.loc[chave, n], tipo):>18}" for n in nomes)
+            g = _fmt_gap(df.loc[chave, col_gap], tipo) if gap else '-'
+            print(f" {rotulo:<24}{vals} | {g:>16}")
+    print('=' * larg + '\n')
+    return df
+def plot_matriz_confusao_final(
+    artefato: Dict[str, Any],
+    bases: Dict[str, Dict[str, Any]],
+    figsize: Tuple[float, float] = (7, 5),
+) -> pd.DataFrame:
+    """
+    Gera uma Matriz de Confusão minimalista para o conjunto Treino + Validação.
+    Foca nos valores absolutos e percentuais relevantes, acompanhada de 
+    uma tabela de resumo direta.
+    """
+    regra = artefato['regra_decisao']
+    y_particoes, pred_particoes = {}, {}
+
+    # Extrai e calcula predições
+    for nome, b in bases.items():
+        th = threshold_dinamico(b['amt'], regra['t_min'], regra['t_max'], regra['k'])
+        pred_particoes[nome] = (np.asarray(b['prob_cal']) >= th).astype(int)
+        y_particoes[nome] = np.asarray(b['y']).astype(int)
+
+    # Consolida Treino + Validação
+    y_total = np.concatenate(list(y_particoes.values()))
+    pred_total = np.concatenate(list(pred_particoes.values()))
+
+    # Calcula a Matriz
+    cm = confusion_matrix(y_total, pred_total, labels=[0, 1])
+    tn, fp, fn, tp = cm.ravel()
+    
+    n_legit, n_fraude = tn + fp, fn + tp
+    n_total = n_legit + n_fraude
+
+    # Estruturação para o Heatmap (Percentual da Classe Real)
+    cm_pct = np.array([
+        [tn / n_legit, fp / n_legit],
+        [fn / n_fraude, tp / n_fraude]
+    ])
+
+    # Plot Minimalista
+    fig, ax = plt.subplots(figsize=figsize)
+    
+    # Heatmap corporativo (Vermelho para Erros, Cinza Escuro para Acertos na Fraude)
+    sns.heatmap(
+        cm_pct, annot=False, cmap='Blues', vmin=0, vmax=1, 
+        cbar=False, linewidths=2, linecolor='white', ax=ax
+    )
+
+    # Rótulos customizados nos 4 quadrantes
+    labels = [
+        ("TN: Legítima Aprovada", tn, cm_pct[0, 0]),
+        ("FP: Falso Alarme", fp, cm_pct[0, 1]),
+        ("FN: Fraude Passou", fn, cm_pct[1, 0]),
+        ("VP: Fraude Bloqueada", tp, cm_pct[1, 1])
+    ]
+    
+    for i, (nome, abs_val, pct_val) in enumerate(labels):
+        row, col = divmod(i, 2)
+        cor_txt = "white" if pct_val > 0.5 else "#333333"
+        ax.text(col + 0.5, row + 0.45, f"{pct_val:.1%}", ha="center", va="center", color=cor_txt, fontsize=16, fontweight='bold')
+        ax.text(col + 0.5, row + 0.65, f"{nome}\nn = {abs_val:,}", ha="center", va="center", color=cor_txt, fontsize=10)
+
+    # Formatação limpa dos eixos
+    ax.set_xticks([0.5, 1.5])
+    ax.set_xticklabels(['Aprovada (0)', 'Bloqueada (1)'], fontsize=11, fontweight='bold')
+    ax.set_yticks([0.5, 1.5])
+    ax.set_yticklabels(['Legítima (0)', 'Fraude (1)'], fontsize=11, fontweight='bold', va='center')
+    
+    ax.set_xlabel('Decisão do Modelo', fontsize=12, fontweight='bold', labelpad=10)
+    ax.set_ylabel('Classe Real', fontsize=12, fontweight='bold', labelpad=10)
+    ax.set_title(f"Matriz de Confusão: \nTreino + Validação", 
+                 loc='left', fontsize=13, fontweight='heavy', pad=15)
+    
+    plt.tight_layout()
+    plt.show()
+
+    # Tabela de Resumo Flat e Direta
+    df_resumo = pd.DataFrame([
+        {'Partição': 'Consolidado', 'Classe Real': 'Legítima (0)', 'Decisão': 'Aprovada (TN)', 'Transações': tn, '% da Classe': f"{tn/n_legit:.2%}"},
+        {'Partição': 'Consolidado', 'Classe Real': 'Legítima (0)', 'Decisão': 'Bloqueada (FP)', 'Transações': fp, '% da Classe': f"{fp/n_legit:.2%}"},
+        {'Partição': 'Consolidado', 'Classe Real': 'Fraude (1)',   'Decisão': 'Aprovada (FN)', 'Transações': fn, '% da Classe': f"{fn/n_fraude:.2%}"},
+        {'Partição': 'Consolidado', 'Classe Real': 'Fraude (1)',   'Decisão': 'Bloqueada (VP)', 'Transações': tp, '% da Classe': f"{tp/n_fraude:.2%}"},
+    ])
+    
+    return df_resumo.set_index(['Partição', 'Classe Real', 'Decisão'])
+
+
+def _serializar_params(modelo) -> Dict[str, Any]:
+    """Hiperparâmetros do estimador em tipos nativos (JSON-safe)."""
+    saida = {}
+    for k, v in modelo.get_params(deep=False).items():
+        if isinstance(v, np.integer):
+            saida[k] = int(v)
+        elif isinstance(v, np.floating):
+            saida[k] = float(v)
+        elif isinstance(v, (int, float, str, bool, list, dict)) or v is None:
+            saida[k] = v
+        else:
+            saida[k] = str(v)
+    return saida
+
+
+def exportar_modelo_final(
+    artefato: Dict[str, Any], df_metricas: pd.DataFrame, diretorio_destino, nome_arquivo: str = 'modelo_fraude_final',
+) -> Dict[str, Path]:
+    """
+    Exporta o modelo final (treinado em 100% da base de Treino) e seus relatórios completos:
+      - <nome>.joblib          : artefato completo (modelo 100% treino + calibrador + features + regra dinâmica);
+      - <nome>_metadata.json   : classe, hiperparâmetros, features, parâmetros do threshold dinâmico e bases;
+      - <nome>_metrics.json    : métricas estatísticas, operacionais do threshold dinâmico, financeiras e gap.
+    """
+    import joblib
+    from datetime import datetime
+
+    dest = Path(diretorio_destino)
+    dest.mkdir(parents=True, exist_ok=True)
+    modelo = artefato['modelo']
+    regra = artefato['regra_decisao']
+
+    caminhos = {
+        'artefato': dest / f'{nome_arquivo}.joblib',
+        'metadata': dest / f'{nome_arquivo}_metadata.json',
+        'metrics': dest / f'{nome_arquivo}_metrics.json',
+    }
+
+    joblib.dump(artefato, caminhos['artefato'])
+
+    cols_bases = [c for c in df_metricas.columns if not c.startswith('Gap')]
+    cols_gap   = [c for c in df_metricas.columns if c.startswith('Gap')]
+
+    metadata = {
+        'nome_modelo': artefato['nome_modelo'],
+        'data_exportacao': datetime.now().isoformat(timespec='seconds'),
+        'treinado_100pct_treino': bool(artefato.get('treinado_100pct_treino', True)),
+        'n_amostras_treino_100pct': artefato.get('n_amostras_treino'),
+        'classe': f"{modelo.__class__.__module__}.{modelo.__class__.__name__}",
+        'calibracao': f"{artefato['calibrador'].__class__.__name__} (ajustada no OOF do Treino)",
+        'hiperparametros': _serializar_params(modelo),
+        'regra_decisao': regra,
+        'total_features': len(artefato['features']),
+        'features_utilizadas': artefato['features'],
+        'bases_avaliadas_modelagem': {
+            b: {'linhas': int(df_metricas.loc['Transações', b]), 'taxa_fraude': float(df_metricas.loc['Taxa Fraude', b])}
+            for b in cols_bases
+        },
+        'uso': "artefato = joblib.load(...); utils.aplicar_regra_dinamica(artefato, X, valor_transacao_usd)",
+    }
+    with open(caminhos['metadata'], 'w', encoding='utf-8') as f:
+        json.dump(metadata, f, indent=2, ensure_ascii=False)
+
+    def _extrair_bloco(col):
+        s = df_metricas[col]
+        return {
+            'independentes_threshold': {
+                'ROC-AUC': float(s['ROC-AUC']),
+                'GINI': float(s['GINI']),
+                'PR-AUC': float(s['PR-AUC']),
+                'KS': float(s['KS']),
+            },
+            'regra_threshold_dinamico': {
+                'Precision': float(s['Precision']),
+                'Recall': float(s['Recall']),
+                'F1-Score': float(s['F1-Score']),
+                'Aprovacao_Legitimas': float(s['Aprovação']),
+                'Aceitacao_Geral': float(s['Aceitação Geral']),
+                'Qtd_VP': None if pd.isna(s['Qtd_VP']) else int(s['Qtd_VP']),
+                'Qtd_FP': None if pd.isna(s['Qtd_FP']) else int(s['Qtd_FP']),
+                'Qtd_FN': None if pd.isna(s['Qtd_FN']) else int(s['Qtd_FN']),
+                'Qtd_VN': None if pd.isna(s['Qtd_VN']) else int(s['Qtd_VN']),
+            },
+            'financeiro_usd': {
+                'Receita_VN_USD': None if pd.isna(s['Receita VN']) else float(s['Receita VN']),
+                'Perda_FP_USD': None if pd.isna(s['Perda FP']) else float(s['Perda FP']),
+                'Chargeback_FN_USD': None if pd.isna(s['Chargeback FN']) else float(s['Chargeback FN']),
+                'Lucro_Liquido_USD': None if pd.isna(s['Lucro Líquido']) else float(s['Lucro Líquido']),
+                'Lucro_Sem_Modelo_USD': None if pd.isna(s['Lucro Sem Modelo']) else float(s['Lucro Sem Modelo']),
+                'Lucro_por_Transacao_USD': float(s['Lucro por Transação']),
+                'Margem_sobre_Volume': float(s['Margem s/ Volume']),
+            },
+        }
+
+    payload_metrics = {
+        'nome_modelo': artefato['nome_modelo'],
+        'treinado_100pct_treino': bool(artefato.get('treinado_100pct_treino', True)),
+        'threshold_dinamico_params': regra,
+        'metricas_por_base': {b: _extrair_bloco(b) for b in cols_bases},
+        'gap_validacao_vs_cv': {
+            k: float(df_metricas.loc[k, cols_gap[0]])
+            for k in df_metricas.index
+            if cols_gap and not pd.isna(df_metricas.loc[k, cols_gap[0]])
+        },
+    }
+    with open(caminhos['metrics'], 'w', encoding='utf-8') as f:
+        json.dump(payload_metrics, f, indent=2, ensure_ascii=False)
+
+    print(f"Artefatos do modelo final ({artefato['nome_modelo']}) exportados com sucesso em {dest}:")
+    for c in caminhos.values():
+        print(f" - {c.name}")
+    return caminhos
+
+
+# ==============================================================================
 # FUNÇÕES DE CLUSTERIZAÇÃO, REDUÇÃO DE DIMENSIONALIDADE E PERFILAMENTO DE FRAUDE
 # ==============================================================================
 
@@ -4634,12 +6276,12 @@ def plot_pca_variancia_acumulada(
     comps = np.arange(1, len(ratios) + 1)
 
     fig, ax = plt.subplots(figsize=(9, 4.8))
-    ax.bar(comps, ratios * 100, alpha=0.55, color="#5DADE2", label="Variância Individual (%)")
-    ax.plot(comps, acum * 100, marker="o", linewidth=2.2, color="#C00000", label="Variância Acumulada (%)")
-    ax.axhline(limiar_referencia * 100, color="#27AE60", linestyle="--", linewidth=1.3, label=f"Referência {limiar_referencia*100:.0f}%")
+    ax.bar(comps, ratios * 100, alpha=0.65, color="#8DB6E3", label="Variância Individual (%)")
+    ax.plot(comps, acum * 100, marker="o", linewidth=2.2, color="#0B2545", label="Variância Acumulada (%)")
+    ax.axhline(limiar_referencia * 100, color="#0096C7", linestyle="--", linewidth=1.3, label=f"Referência {limiar_referencia*100:.0f}%")
 
     for c, v in zip(comps, acum * 100):
-        ax.annotate(f"{v:.1f}%", (c, v), textcoords="offset points", xytext=(0, 8), ha="center", fontsize=8.5, fontweight="bold", color="#900C3F")
+        ax.annotate(f"{v:.1f}%", (c, v), textcoords="offset points", xytext=(0, 8), ha="center", fontsize=8.5, fontweight="bold", color="#0B2545")
 
     ax.set_title("PCA — Variância Explicada Acumulada", fontweight="bold", fontsize=12)
     ax.set_xlabel("Componente Principal")
@@ -4739,7 +6381,7 @@ def plot_elbow_comparativo(
     if n_espacos == 1:
         axes = [axes]
 
-    cores = ["#2E86C1", "#C00000", "#28B463", "#8E44AD"]
+    cores = ["#0B2545", "#0096C7", "#2E86C1", "#48CAE4"]
     for idx, (titulo, dados) in enumerate(resultados_dict.items()):
         ax = axes[idx]
         if isinstance(dados, pd.DataFrame):
@@ -4772,9 +6414,9 @@ def plot_metricas_validacao(
     fig, axes = plt.subplots(1, 3, figsize=(15, 4.6))
     ks = df_metricas["K"].values
     configs = [
-        ("Silhouette", "Silhouette Score (↑ melhor)", "#2E86C1", True),
-        ("Davies_Bouldin", "Davies-Bouldin (↓ melhor)", "#C00000", False),
-        ("Calinski_Harabasz", "Calinski-Harabasz (↑ melhor)", "#28B463", True),
+        ("Silhouette", "Silhouette Score (↑ melhor)", "#13579B", True),
+        ("Davies_Bouldin", "Davies-Bouldin (↓ melhor)", "#0096C7", False),
+        ("Calinski_Harabasz", "Calinski-Harabasz (↑ melhor)", "#0B2545", True),
     ]
 
     for ax, (col, titulo, cor, maior_melhor) in zip(axes, configs):
@@ -4783,7 +6425,7 @@ def plot_metricas_validacao(
         idx_melhor = int(np.argmax(vals) if maior_melhor else np.argmin(vals))
         k_best = ks[idx_melhor]
         v_best = vals[idx_melhor]
-        ax.scatter([k_best], [v_best], s=110, color="#F39C12", zorder=5, edgecolor="black", label=f"Melhor K={k_best} ({v_best:.3f})")
+        ax.scatter([k_best], [v_best], s=110, color="#48CAE4", zorder=5, edgecolor="#0B2545", linewidth=1.5, label=f"Melhor K={k_best} ({v_best:.3f})")
         ax.set_title(titulo, fontweight="bold", fontsize=10.5)
         ax.set_xlabel("K")
         ax.set_xticks(ks)
@@ -4815,10 +6457,10 @@ def plot_k_distance_dbscan(
 
     p90, p95, p99 = np.percentile(k_dists, [90, 95, 99])
     fig, ax = plt.subplots(figsize=(9.5, 4.6))
-    ax.plot(k_dists, linewidth=1.8, color="#2E86C1", label=f"Distância ao {k}º vizinho")
-    ax.axhline(p90, color="#28B463", linestyle="--", linewidth=1.2, label=f"P90 = {p90:.3f}")
-    ax.axhline(p95, color="#F39C12", linestyle="--", linewidth=1.2, label=f"P95 = {p95:.3f}")
-    ax.axhline(p99, color="#C00000", linestyle="--", linewidth=1.2, label=f"P99 = {p99:.3f}")
+    ax.plot(k_dists, linewidth=1.8, color="#0B2545", label=f"Distância ao {k}º vizinho")
+    ax.axhline(p90, color="#48CAE4", linestyle="--", linewidth=1.2, label=f"P90 = {p90:.3f}")
+    ax.axhline(p95, color="#0096C7", linestyle="--", linewidth=1.2, label=f"P95 = {p95:.3f}")
+    ax.axhline(p99, color="#13579B", linestyle="--", linewidth=1.2, label=f"P99 = {p99:.3f}")
 
     ax.set_title(f"Curva k-Distance (k={k}) — Estimativa de eps ({titulo_espaco})", fontweight="bold", fontsize=11.5)
     ax.set_xlabel("Amostras Ordenadas por Distância")
@@ -4888,7 +6530,7 @@ def plot_metricas_dbscan(
 ) -> plt.Figure:
     """Plota Silhouette, % de Ruído e N_Clusters na grade do DBSCAN (adaptado do Projeto-07)."""
     fig, axes = plt.subplots(1, 3, figsize=(16, 4.8))
-    cores = ["#2E86C1", "#C00000", "#28B463", "#8E44AD", "#D35400"]
+    cores = ["#0B2545", "#0096C7", "#2E86C1", "#48CAE4", "#8DB6E3"]
 
     for idx, ms in enumerate(sorted(df_res["min_samples"].unique())):
         sub = df_res[df_res["min_samples"] == ms].sort_values("eps")
@@ -4984,7 +6626,7 @@ def plot_metricas_hdbscan(
 ) -> plt.Figure:
     """Plota DBCV, Silhouette, % Ruído e N_Clusters na grade do HDBSCAN (adaptado do Projeto-07)."""
     fig, axes = plt.subplots(1, 4, figsize=(18, 4.6))
-    cores = ["#2E86C1", "#C00000", "#28B463", "#8E44AD"]
+    cores = ["#0B2545", "#0096C7", "#2E86C1", "#48CAE4"]
 
     for idx, ms in enumerate(sorted(df_res["min_samples"].unique())):
         sub = df_res[df_res["min_samples"] == ms].sort_values("min_cluster_size")
@@ -5064,7 +6706,7 @@ def plot_distribuicao_clusters(
     total = contagem.sum()
 
     fig, ax = plt.subplots(figsize=(max(7.5, len(contagem) * 0.9), 4.6))
-    cores = ["#95A5A6" if idx == -1 else "#2E86C1" for idx in contagem.index]
+    cores = ["#97A3B0" if idx == -1 else "#13579B" for idx in contagem.index]
     nomes = ["Ruído (-1)" if idx == -1 else f"Cluster {idx}" for idx in contagem.index]
 
     bars = ax.bar(nomes, contagem.values, color=cores, edgecolor="black", alpha=0.88)
@@ -5107,46 +6749,126 @@ def plot_clusters_2d_plotly(
     except ImportError as exc:
         raise ImportError("Pacote 'plotly' não encontrado. Instale com `pip install plotly`.") from exc
 
+    X_arr = np.asarray(X_2d)
+    if X_arr.ndim != 2 or X_arr.shape[1] < 2:
+        raise ValueError(f"`X_2d` deve ter shape (n, >=2); recebido {X_arr.shape}.")
+    labels_arr = np.asarray(labels)
+    if len(labels_arr) != len(X_arr):
+        raise ValueError(f"Tamanhos incompatíveis: X_2d={len(X_arr)} vs labels={len(labels_arr)}.")
+
     df_plot = pd.DataFrame({
-        "Dim_1": X_2d[:, 0],
-        "Dim_2": X_2d[:, 1],
-        "Cluster": ["Ruído (-1)" if lbl == -1 else f"Cluster {lbl}" for lbl in labels],
+        "Dim_1": X_arr[:, 0],
+        "Dim_2": X_arr[:, 1],
+        "Cluster": [
+            "Ruído (-1)" if (lbl == -1 or str(lbl) == "-1" or str(lbl) == "Ruído (-1)") else f"Cluster {lbl}"
+            for lbl in labels_arr
+        ],
     })
 
     hover_cols: List[str] = []
     if hover_df is not None:
+        if len(hover_df) != len(X_arr):
+            raise ValueError(f"Tamanhos incompatíveis: X_2d={len(X_arr)} vs hover_df={len(hover_df)}.")
         for col in ["TransactionAmt", "ProductCD", "card4", "device_brand", "P_emaildomain"]:
             if col in hover_df.columns:
                 vals = hover_df[col].reset_index(drop=True)
-                if col == "TransactionAmt" and pd.api.types.is_numeric_dtype(vals) and vals.dropna().max() <= 20:
-                    df_plot["Ticket_USD"] = np.round(np.expm1(vals), 2)
-                    hover_cols.append("Ticket_USD")
+                if col == "TransactionAmt" and pd.api.types.is_numeric_dtype(vals):
+                    vals_num = pd.to_numeric(vals, errors="coerce").astype(float)
+                    if not vals_num.dropna().empty and float(vals_num.dropna().max()) <= 20:
+                        df_plot["Ticket_USD"] = np.round(np.expm1(vals_num), 2)
+                        hover_cols.append("Ticket_USD")
+                    else:
+                        df_plot[col] = np.round(vals_num, 2)
+                        hover_cols.append(col)
                 else:
-                    df_plot[col] = vals
+                    df_plot[col] = vals.astype(object).where(vals.notna(), "N/A").astype(str)
                     hover_cols.append(col)
 
     if sample_plot is not None and len(df_plot) > sample_plot:
         df_plot = df_plot.sample(n=sample_plot, random_state=random_state)
 
-    ordem_clusters = sorted(df_plot["Cluster"].unique(), key=lambda s: (s != "Ruído (-1)", s))
-    color_map = {"Ruído (-1)": "#B0B0B0"}
+    def _chave_ordem_cluster(nome: str) -> Tuple[int, int, str]:
+        if nome == "Ruído (-1)":
+            return (2, 0, nome)
+        suf = nome.replace("Cluster ", "", 1)
+        return (0, int(suf), nome) if suf.lstrip("-").isdigit() else (1, 0, nome)
+
+    ordem_clusters = sorted(df_plot["Cluster"].unique(), key=_chave_ordem_cluster)
+    color_map = {"Ruído (-1)": COR_RUIDO_CLUSTER}
+    sequencia_azul = ["#0B2545", "#13579B", "#0077B6", "#0096C7", "#00B4D8", "#2E86C1", "#48CAE4", "#5DADE2", "#8DB6E3", "#1D3557"]
 
     fig = px.scatter(
         df_plot,
         x="Dim_1",
         y="Dim_2",
         color="Cluster",
+        labels={"Dim_1": "UMAP 1", "Dim_2": "UMAP 2"},
         category_orders={"Cluster": ordem_clusters},
         color_discrete_map=color_map,
+        color_discrete_sequence=sequencia_azul,
         hover_data=hover_cols if hover_cols else None,
         title=titulo,
         opacity=0.68,
+        render_mode="svg",
         template="plotly_white",
     )
     fig.update_traces(marker=dict(size=4.5))
-    fig.update_layout(height=580, legend_title_text="Cluster")
+    fig.update_layout(height=580, legend_title_text="Cluster", legend=dict(itemsizing="constant"))
     _salvar_figura_opcional(fig, nome_arquivo=nome_arquivo, save_dir=save_dir)
     return fig
+
+
+def _resolver_colunas_perfil_fraude(df: pd.DataFrame) -> Dict[str, List[str]]:
+    """Seleciona colunas comportamentais para perfilamento, suportando nomes atuais (01_EDA) e legados."""
+    def _primeiro(opcoes: Iterable[str]) -> List[str]:
+        return next(([c] for c in opcoes if c in df.columns), [])
+
+    def _varios_unicos(opcoes: Iterable[str], limite: int) -> List[str]:
+        escolhidas: List[str] = []
+        vistos = set()
+        for c in opcoes:
+            if c in df.columns and c not in vistos:
+                escolhidas.append(c)
+                vistos.add(c)
+                if len(escolhidas) >= limite:
+                    break
+        return escolhidas
+
+    cols_moda = (
+        _primeiro(["ProductCD"])
+        + _primeiro(["card4"])
+        + _primeiro(["cartao_tipo_cat", "card6_limpo"])
+        + _primeiro(["disp_marca", "device_brand"])
+        + _primeiro(["P_emaildomain"])
+    )
+    cols_nulos = _primeiro(["cont_null_tr", "tr_null_count"]) + _primeiro(["cont_null_id", "id_null_count"])
+    cols_c = _varios_unicos(
+        ["vel_C1", "vel_C2", "vel_C5", "vel_C8", "vel_C13", "vel_C14"]
+        + [f"vel_C{i}" for i in range(1, 15)]
+        + ["C1", "C2", "C5", "C8", "C13", "C14"]
+        + [f"C{i}" for i in range(1, 15)],
+        limite=5,
+    )
+    cols_d = _varios_unicos(
+        ["delta_D1", "delta_D2", "delta_D4", "delta_D10", "delta_D15"]
+        + [f"delta_D{i}" for i in range(1, 16)]
+        + ["D1", "D2", "D4", "D10", "D15"]
+        + [f"D{i}" for i in range(1, 16)],
+        limite=4,
+    )
+    cols_extras = (
+        _primeiro(["valor_razao_media_card1", "TransactionAmt_to_mean_card1"])
+        + _primeiro(["match_cont_T", "M_true_count"])
+        + _primeiro(["match_cont_F"])
+        + _primeiro(["tempo_hora"])
+    )
+    return {
+        "moda": cols_moda,
+        "nulos": cols_nulos,
+        "vel": cols_c,
+        "delta": cols_d,
+        "extras": cols_extras,
+    }
 
 
 def gerar_perfil_fraude_clusters(
@@ -5154,7 +6876,7 @@ def gerar_perfil_fraude_clusters(
     col_cluster: str = "cluster_campeao",
     ignorar_ruido: bool = False,
 ) -> pd.DataFrame:
-    """Gera tabela de perfilamento de negócio por cluster (Etapa 6): financeiro, infraestrutura e comportamento."""
+    """Gera tabela de perfilamento de negócio por cluster: financeiro, modas, nulos, velocidade (C), deltas (D) e validações."""
     df = df_fraude.copy()
     if ignorar_ruido:
         df = df[df[col_cluster] != -1].copy()
@@ -5169,9 +6891,18 @@ def gerar_perfil_fraude_clusters(
         else:
             df["_amt_usd"] = df["TransactionAmt"].astype("float64")
 
-    cols_moda = [c for c in ["ProductCD", "card4", "card6_limpo", "device_brand", "P_emaildomain"] if c in df.columns]
-    cols_nulos = [c for c in ["tr_null_count", "id_null_count"] if c in df.columns]
-    cols_c = [f"C{i}" for i in range(1, 15) if f"C{i}" in df.columns][:5]
+    mapa_cols = _resolver_colunas_perfil_fraude(df)
+    cols_moda = mapa_cols["moda"]
+    cols_contagem_real = [
+        c for c in mapa_cols["nulos"] + mapa_cols["vel"] + mapa_cols["delta"]
+        if pd.api.types.is_numeric_dtype(df[c])
+    ]
+    cols_extras_num = [c for c in mapa_cols["extras"] if pd.api.types.is_numeric_dtype(df[c])]
+    col_id_null = next((c for c in ["cont_null_id", "id_null_count"] if c in df.columns), None)
+
+    # Reversão global consistente de log1p nas contagens/deltas antes de agrupar por cluster
+    if cols_contagem_real:
+        df, _ = reverter_escala_log1p(df, cols_monetarias=(), cols_contagem=cols_contagem_real, verbose=False)
 
     linhas = []
     for cid, grupo in df.groupby(col_cluster, sort=True):
@@ -5193,12 +6924,11 @@ def gerar_perfil_fraude_clusters(
             if not vc.empty:
                 registro[f"{col}_Moda"] = f"{vc.index[0]} ({vc.iloc[0]*100:.1f}%)"
 
-        for col in cols_nulos + cols_c:
-            serie_num = grupo[col].astype("float64")
-            if col in cols_c and not serie_num.dropna().empty and serie_num.dropna().min() >= 0 and serie_num.dropna().max() <= 15.0:
-                # Mantém legibilidade em contagens reais caso a coluna C tenha vindo em log1p do EDA
-                serie_num = np.expm1(serie_num)
-            registro[f"Media_{col}"] = round(float(serie_num.mean()), 2)
+        if col_id_null is not None:
+            registro["%_Sem_Identidade"] = round(float(grupo[col_id_null].isna().mean() * 100), 1)
+
+        for col in cols_contagem_real + cols_extras_num:
+            registro[f"Media_{col}"] = round(float(grupo[col].astype("float64").mean()), 2)
 
         linhas.append(registro)
 
@@ -5236,7 +6966,7 @@ def plot_violino_perfil_clusters(
         axes = [axes]
 
     for ax, col in zip(axes, cols_numericas):
-        sns.boxplot(data=df, x="_cluster_label", y=col, order=ordem, hue="_cluster_label", legend=False, palette="Set2", showfliers=False, ax=ax)
+        sns.boxplot(data=df, x="_cluster_label", y=col, order=ordem, hue="_cluster_label", legend=False, palette="Blues", showfliers=False, ax=ax)
         ax.set_title(col, fontweight="bold", fontsize=11)
         ax.set_xlabel("Cluster")
         ax.grid(axis="y", alpha=0.25)
@@ -5515,8 +7245,8 @@ def plot_optuna_clusterizacao(
 
     if not validos.empty:
         axes[0].plot(validos["trial"], validos["objetivo"], marker="o", linestyle="-", alpha=0.75, color="#2E86C1", label="Trial válido")
-        axes[0].plot(validos["trial"], validos["objetivo"].cummax(), linestyle="--", linewidth=2.0, color="#C00000", label="Melhor acumulado")
-        sc = axes[1].scatter(validos["%_Ruido"], validos["objetivo"], c=validos["N_Clusters"], cmap="viridis", s=65, edgecolor="black", alpha=0.85)
+        axes[0].plot(validos["trial"], validos["objetivo"].cummax(), linestyle="--", linewidth=2.0, color="#0B2545", label="Melhor acumulado")
+        sc = axes[1].scatter(validos["%_Ruido"], validos["objetivo"], c=validos["N_Clusters"], cmap="PuBu", s=65, edgecolor="#0B2545", alpha=0.85)
         plt.colorbar(sc, ax=axes[1], label="Nº de Clusters")
     else:
         axes[0].text(0.5, 0.5, "Nenhum trial viável encontrado", ha="center", va="center", transform=axes[0].transAxes)
@@ -5608,29 +7338,36 @@ def plot_heatmap_zscore_clusters(
     if ignorar_ruido:
         df_work = df_work[df_work[col_cluster] != -1].copy()
 
-    # Garante D*_ancora temporária se ainda existirem D* brutos + TransactionDT
+    mapa_cols = _resolver_colunas_perfil_fraude(df_work)
+    cols_contagem = [
+        c for c in mapa_cols["nulos"] + mapa_cols["vel"] + mapa_cols["delta"]
+        if pd.api.types.is_numeric_dtype(df_work[c])
+    ]
+    df_work, _ = reverter_escala_log1p(
+        df_work,
+        cols_monetarias=["TransactionAmt"],
+        cols_contagem=cols_contagem,
+        verbose=False,
+    )
+
+    # Ancora deltas D*/delta_D* contra TransactionDT (remove drift temporal no heatmap)
+    cols_d_ancora: List[str] = []
     if "TransactionDT" in df_work.columns:
         dias_dt = df_work["TransactionDT"].astype("float64") / 86400.0
-        for col_d in ["D1", "D2", "D4", "D10", "D15"]:
+        for col_d in mapa_cols["delta"]:
             col_anc = f"{col_d}_ancora"
-            if col_anc not in df_work.columns and col_d in df_work.columns and pd.api.types.is_numeric_dtype(df_work[col_d]):
-                s_d = df_work[col_d].astype("float64")
-                v = s_d.dropna()
-                if not v.empty and v.min() >= 0 and v.max() <= 10.0:
-                    s_d = np.expm1(s_d)
-                df_work[col_anc] = s_d - dias_dt
+            if col_anc not in df_work.columns and pd.api.types.is_numeric_dtype(df_work[col_d]):
+                df_work[col_anc] = df_work[col_d].astype("float64") - dias_dt
+            if col_anc in df_work.columns:
+                cols_d_ancora.append(col_anc)
 
-    # Reverte log1p de TransactionAmt apenas na cópia se vier em escala log
-    if "TransactionAmt" in df_work.columns and pd.api.types.is_numeric_dtype(df_work["TransactionAmt"]):
-        v_amt = df_work["TransactionAmt"].dropna()
-        if not v_amt.empty and v_amt.min() >= 0 and v_amt.max() <= 20.0:
-            df_work["TransactionAmt"] = np.expm1(df_work["TransactionAmt"].astype("float64"))
-
-    padrao_feats = [
-        "TransactionAmt", "tr_null_count", "id_null_count", "M_true_count",
-        "C1", "C2", "C5", "C8", "C13", "C14",
-        "D1_ancora", "D2_ancora", "D4_ancora",
-    ]
+    padrao_feats = (
+        (["TransactionAmt"] if "TransactionAmt" in df_work.columns else [])
+        + mapa_cols["nulos"]
+        + mapa_cols["vel"]
+        + (cols_d_ancora if cols_d_ancora else mapa_cols["delta"])
+        + mapa_cols["extras"]
+    )
     candidatas = features_continuas if features_continuas is not None else padrao_feats
     cols_validas = [
         c for c in candidatas
@@ -5643,7 +7380,7 @@ def plot_heatmap_zscore_clusters(
     stds = medias.std(ddof=0).replace(0.0, 1.0).fillna(1.0)
     zscore_clusters = ((medias - medias.mean()) / stds).fillna(0.0)
 
-    cmap_corp = LinearSegmentedColormap.from_list("corp_reds", ["#F0F0F0", "#BDBDBD", "#CD0000"])
+    cmap_corp = LinearSegmentedColormap.from_list("corp_blues", ["#F5F9FD", "#8DB6E3", "#0096C7", "#0B2545"])
     altura = max(6.0, 0.55 * len(cols_validas))
     largura = max(10.0, 1.15 * len(zscore_clusters))
 
@@ -5679,8 +7416,8 @@ def plot_painel_fraude_bivariado(
     col_hora: str = 'tempo_hora',
     col_valor: str = 'TransactionAmt',
     col_canal: str = 'ProductCD',
-    cor_fraude: str = '#d62728',
-    cor_legitima: str = '#4a4a4a',
+    cor_fraude: str = '#0B2545',
+    cor_legitima: str = '#48CAE4',
     figsize: tuple = (18, 5),
 ):
     """
@@ -5740,8 +7477,8 @@ def plot_evolucao_temporal_fraude(
     df: pd.DataFrame,
     col_target: str = 'isFraud',
     col_dia: str = 'tempo_dia_corrido',
-    cor_fraude: str = '#d62728',
-    cor_volume: str = '#7f7f7f',
+    cor_fraude: str = '#0B2545',
+    cor_volume: str = '#8DB6E3',
     figsize: tuple = (18, 4.5),
 ):
     """
@@ -5775,6 +7512,2138 @@ def plot_evolucao_temporal_fraude(
     plt.tight_layout()
     plt.show()
     return evolucao_dia
+
+
+# ==============================================================================
+# CONSOLIDAÇÃO DOS ARQUÉTIPOS DE FRAUDE (SEÇÃO 6.0) E BENCHMARK HDBSCAN (SEÇÃO 7.0)
+# ==============================================================================
+# Paleta categórica validada (todos os pares, inclusive scatter) para os 4 arquétipos.
+# Cada cor acompanha a entidade (arquétipo) em todos os gráficos, nunca o ranking.
+PALETA_ARQUETIPOS_PADRAO: Tuple[str, ...] = ("#0B2545", "#13579B", "#0096C7", "#5DADE2")
+COR_RUIDO_CLUSTER = "#97A3B0"
+_COR_TEXTO_PRIMARIO = "#0B2545"
+_COR_TEXTO_SECUNDARIO = "#5A6878"
+
+
+def _serie_parece_log1p(serie: pd.Series, limite_max: float, exigir_fracionario: bool) -> bool:
+    """Heurística de escala `log1p`.
+
+    - Valores monetários (`exigir_fracionario=False`): não-negativos e `max <= limite_max`
+      (mesma regra de `gerar_perfil_fraude_clusters`, garantindo consistência entre tabelas).
+    - Contagens (`exigir_fracionario=True`): além do limite, a maioria dos valores não-nulos
+      precisa ser fracionária. Contagens reais são inteiras; `log1p(k)` só é inteiro em k=0.
+    """
+    v = pd.to_numeric(serie, errors="coerce").dropna().astype("float64")
+    if v.empty or v.min() < 0 or v.max() > limite_max:
+        return False
+    if not exigir_fracionario:
+        return True
+    nao_zero = v[v != 0]
+    if nao_zero.empty:
+        return False
+    frac_fracionarios = float((np.abs(nao_zero - np.round(nao_zero)) > 1e-6).mean())
+    return frac_fracionarios > 0.5
+
+
+def reverter_escala_log1p(
+    df: pd.DataFrame,
+    cols_monetarias: Iterable[str] = ("TransactionAmt",),
+    cols_contagem: Optional[Iterable[str]] = None,
+    limite_monetario: float = 20.0,
+    limite_contagem: float = 15.0,
+    verbose: bool = True,
+) -> Tuple[pd.DataFrame, Dict[str, bool]]:
+    """Retorna cópia do DataFrame com colunas em `log1p` reconvertidas via `np.expm1`.
+
+    A detecção é feita **na coluna inteira** (não por grupo), evitando reconversões
+    inconsistentes entre clusters. Retorna também `{coluna: foi_reconvertida}`.
+    """
+    df_out = df.copy()
+    if cols_contagem is None:
+        cols_contagem = [f"C{i}" for i in range(1, 15)] + ["tr_null_count", "id_null_count"]
+
+    relatorio: Dict[str, bool] = {}
+    for col, limite, exige_frac in (
+        [(c, limite_monetario, False) for c in cols_monetarias]
+        + [(c, limite_contagem, True) for c in cols_contagem]
+    ):
+        if col not in df_out.columns or not pd.api.types.is_numeric_dtype(df_out[col]):
+            continue
+        em_log = _serie_parece_log1p(df_out[col], limite, exige_frac)
+        if em_log:
+            df_out[col] = np.expm1(df_out[col].astype("float64"))
+        else:
+            df_out[col] = df_out[col].astype("float64")
+        relatorio[col] = em_log
+
+    if verbose:
+        convertidas = [c for c, ok in relatorio.items() if ok]
+        mantidas = [c for c, ok in relatorio.items() if not ok]
+        print(f"Escala real (expm1) aplicada em : {convertidas if convertidas else 'nenhuma'}")
+        print(f"Já em escala real (mantidas)    : {mantidas if mantidas else 'nenhuma'}")
+    return df_out, relatorio
+
+
+def gerar_tabela_arquetipos(
+    df_fraude: pd.DataFrame,
+    col_grupo: str = "arquetipo",
+    ordem: Optional[List[str]] = None,
+    col_cluster_origem: Optional[str] = "cluster",
+) -> pd.DataFrame:
+    """Tabela consolidada de totais por arquétipo (macrogrupo de clusters).
+
+    Reaproveita `gerar_perfil_fraude_clusters` para financeiro (US$ reconvertido) e modas,
+    adiciona os shares de volume/prejuízo e recalcula as médias de contagem (`C*`,
+    `*_null_count`) na escala real com detecção global de `log1p`.
+    """
+    if col_grupo not in df_fraude.columns:
+        raise KeyError(f"Coluna '{col_grupo}' não encontrada em df_fraude.")
+
+    perfil = gerar_perfil_fraude_clusters(df_fraude, col_cluster=col_grupo, ignorar_ruido=False)
+    perfil["Arquetipo"] = perfil["Cluster"].astype(str).str.replace(r"^Cluster ", "", regex=True)
+    perfil = perfil.drop(columns="Cluster").set_index("Arquetipo")
+
+    # Médias de contagem em escala real (detecção global, não por grupo)
+    cols_media = [c for c in ["C1", "C2", "C13", "C14", "tr_null_count", "id_null_count"] if c in df_fraude.columns]
+    df_real, _ = reverter_escala_log1p(df_fraude[[col_grupo] + cols_media], cols_monetarias=(), cols_contagem=cols_media, verbose=False)
+    medias = df_real.groupby(col_grupo, observed=True)[cols_media].mean().round(2)
+    for col in cols_media:
+        perfil[f"Media_{col}"] = medias[col]
+
+    if "id_null_count" in df_fraude.columns:
+        perfil["%_Sem_Identidade"] = (
+            df_fraude["id_null_count"].isna().groupby(df_fraude[col_grupo], observed=True).mean().mul(100).round(1)
+        )
+
+    if col_cluster_origem and col_cluster_origem in df_fraude.columns:
+        perfil["Clusters_KMeans"] = (
+            df_fraude.groupby(col_grupo, observed=True)[col_cluster_origem]
+            .apply(lambda s: ", ".join(str(int(c)) for c in sorted(s.unique())))
+        )
+
+    if "Prejuizo_Total_USD" in perfil.columns:
+        prejuizo_total = perfil["Prejuizo_Total_USD"].sum()
+        perfil["%_Prejuizo_Total"] = (perfil["Prejuizo_Total_USD"] / prejuizo_total * 100).round(2)
+        # Alavancagem > 1: o grupo gera mais prejuízo do que seu peso em quantidade sugere
+        perfil["Alavancagem_Prejuizo_vs_Volume"] = (perfil["%_Prejuizo_Total"] / perfil["%_Fraudes"]).round(2)
+
+    ordem_final = [g for g in (ordem or sorted(perfil.index)) if g in perfil.index]
+    perfil = perfil.loc[ordem_final]
+
+    colunas = [
+        "Clusters_KMeans", "N_Fraudes", "%_Fraudes", "Prejuizo_Total_USD", "%_Prejuizo_Total",
+        "Alavancagem_Prejuizo_vs_Volume", "Ticket_Medio_USD", "Ticket_Mediano_USD",
+        "ProductCD_Moda", "cartao_tipo_cat_Moda", "card6_limpo_Moda",
+        "disp_marca_Moda", "device_brand_Moda", "P_emaildomain_Moda",
+        "%_Sem_Identidade", "Media_cont_null_tr", "Media_tr_null_count",
+        "Media_cont_null_id", "Media_id_null_count",
+        "Media_vel_C2", "Media_C2", "Media_vel_C8", "Media_vel_C12",
+        "Media_delta_D1", "Media_D1", "Media_match_cont_T", "Media_tempo_hora",
+    ]
+    return perfil[[c for c in colunas if c in perfil.columns]].reset_index()
+
+
+def plot_volume_vs_prejuizo_arquetipos(
+    df_tabela: pd.DataFrame,
+    col_grupo: str = "Arquetipo",
+    col_volume: str = "%_Fraudes",
+    col_prejuizo: str = "%_Prejuizo_Total",
+    titulo: str = "Participação em quantidade vs. prejuízo (US$) por arquétipo",
+    nome_arquivo: Optional[str] = None,
+    save_dir: Optional[Union[str, Path]] = None,
+) -> plt.Figure:
+    """Barras lado a lado: share de quantidade (%) vs. share de prejuízo em US$ (%) por arquétipo.
+
+    As cores codificam a **métrica** (cinza claro = volume, grafite = prejuízo), não o arquétipo,
+    para não conflitar com a paleta categórica dos demais gráficos. O rótulo do eixo X traz a
+    alavancagem (prejuízo% / volume%): > 1× indica impacto financeiro desproporcional ao volume.
+    """
+    df = df_tabela[[col_grupo, col_volume, col_prejuizo]].copy()
+    df["_alav"] = df[col_prejuizo] / df[col_volume]
+
+    cor_volume, cor_prejuizo = "#8DB6E3", "#0B2545"
+    x = np.arange(len(df))
+    largura = 0.38
+    folga = 0.02  # espaço de 2% entre barras adjacentes
+
+    fig, ax = plt.subplots(figsize=(11.5, 5.4))
+    b_vol = ax.bar(x - largura / 2 - folga, df[col_volume], width=largura, color=cor_volume, label="Volume (% das fraudes)")
+    b_prej = ax.bar(x + largura / 2 + folga, df[col_prejuizo], width=largura, color=cor_prejuizo, label="Prejuízo (% do US$ total)")
+
+    teto = float(max(df[col_volume].max(), df[col_prejuizo].max()))
+    for barras in (b_vol, b_prej):
+        for bar in barras:
+            h = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width() / 2, h + teto * 0.015, f"{h:.1f}%",
+                    ha="center", va="bottom", fontsize=9.5, color=_COR_TEXTO_PRIMARIO, fontweight="bold")
+
+    rotulos = [f"{g}\nalavancagem {a:.2f}×" for g, a in zip(df[col_grupo], df["_alav"])]
+    ax.set_xticks(x)
+    ax.set_xticklabels(rotulos, fontsize=10, color=_COR_TEXTO_PRIMARIO)
+    ax.set_ylabel("Participação (%)", color=_COR_TEXTO_SECUNDARIO)
+    ax.set_ylim(0, teto * 1.18)
+    ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda v, _: f"{v:.0f}%"))
+    ax.grid(axis="y", alpha=0.2)
+    ax.set_axisbelow(True)
+    ax.tick_params(axis="x", length=0)
+    ax.legend(frameon=False, loc="lower left", bbox_to_anchor=(0.0, 1.04), ncol=2, fontsize=9.5)
+    ax.set_title(titulo, fontweight="bold", fontsize=12.5, loc="left", pad=34)
+    sns.despine(ax=ax)
+    plt.tight_layout()
+    _salvar_figura_opcional(fig, nome_arquivo=nome_arquivo, save_dir=save_dir)
+    return fig
+
+
+def plot_violino_arquetipos(
+    df_fraude: pd.DataFrame,
+    col_grupo: str = "arquetipo",
+    cols: Optional[Dict[str, str]] = None,
+    ordem: Optional[List[str]] = None,
+    paleta: Optional[Dict[str, str]] = None,
+    quantil_corte: float = 0.99,
+    titulo: str = "Assinatura comportamental dos 4 arquétipos (escala real, cauda > p99 removida)",
+    nome_arquivo: Optional[str] = None,
+    save_dir: Optional[Union[str, Path]] = None,
+) -> plt.Figure:
+    """Violinos (mediana e quartis tracejados) das variáveis-chave por arquétipo, em escala real.
+
+    `cols` mapeia coluna -> rótulo do eixo Y. Valores acima do quantil global `quantil_corte`
+    de cada variável são excluídos **apenas do gráfico** para que a cauda extrema não esmague
+    o eixo. Arquétipos sem nenhum valor (ex.: `id_null_count` 100% NaN) recebem uma nota.
+    """
+    if cols is None:
+        cols = {
+            "TransactionAmt": "Ticket (US$)",
+            "vel_C2": "vel_C2 — velocidade/recorrência (contagem)",
+            "cont_null_id": "cont_null_id (nulos de identidade)",
+            "cont_null_tr": "cont_null_tr (nulos transacionais)",
+        }
+    aliases = {
+        "C2": "vel_C2", "vel_C2": "C2",
+        "id_null_count": "cont_null_id", "cont_null_id": "id_null_count",
+        "tr_null_count": "cont_null_tr", "cont_null_tr": "tr_null_count",
+        "D1": "delta_D1", "delta_D1": "D1",
+    }
+    cols_resolvidas: Dict[str, str] = {}
+    for c, r in cols.items():
+        if c in df_fraude.columns:
+            cols_resolvidas[c] = r
+        elif aliases.get(c) in df_fraude.columns:
+            cols_resolvidas[aliases[c]] = r
+    cols = cols_resolvidas
+    if not cols:
+        raise ValueError("Nenhuma das colunas solicitadas está presente em df_fraude.")
+
+    df_real, _ = reverter_escala_log1p(
+        df_fraude[[col_grupo] + list(cols)],
+        cols_monetarias=[c for c in cols if c == "TransactionAmt"],
+        cols_contagem=[c for c in cols if c != "TransactionAmt"],
+        verbose=False,
+    )
+    ordem = ordem or sorted(df_real[col_grupo].dropna().unique())
+    paleta = paleta or dict(zip(ordem, PALETA_ARQUETIPOS_PADRAO))
+
+    n = len(cols)
+    n_lin, n_col = (2, 2) if n == 4 else (1, n)
+    fig, axes = plt.subplots(n_lin, n_col, figsize=(7.2 * n_col, 4.6 * n_lin))
+    axes = np.atleast_1d(axes).ravel()
+
+    for ax, (col, rotulo) in zip(axes, cols.items()):
+        serie = df_real[col]
+        corte = float(serie.quantile(quantil_corte)) if serie.notna().any() else np.nan
+        df_plot = df_real.loc[serie.notna() & (serie <= corte), [col_grupo, col]]
+        presentes = [g for g in ordem if int((df_plot[col_grupo] == g).sum()) >= 5]
+        df_plot = df_plot[df_plot[col_grupo].isin(presentes)]
+
+        if presentes:
+            sns.violinplot(
+                data=df_plot, x=col_grupo, y=col, order=ordem, hue=col_grupo, hue_order=ordem,
+                palette=paleta, inner="quart", cut=0, density_norm="width", linewidth=1.0,
+                saturation=1.0, legend=False, ax=ax,
+            )
+            for coll in ax.collections:
+                coll.set_alpha(0.85)
+            # Mediana como ponto branco com borda escura (legível sobre qualquer cor)
+            medianas = df_plot.groupby(col_grupo, observed=True)[col].median()
+            for i, g in enumerate(ordem):
+                if g in medianas.index and pd.notna(medianas[g]):
+                    ax.scatter(i, medianas[g], s=36, color="white", edgecolor=_COR_TEXTO_PRIMARIO, linewidth=1.2, zorder=5)
+
+        y_min, y_max = ax.get_ylim()
+        for i, g in enumerate(ordem):
+            if g not in presentes:
+                ax.text(i, y_min + (y_max - y_min) * 0.5, "sem registro\nde identidade\n(~100% NaN)",
+                        ha="center", va="center", fontsize=8.5, color=_COR_TEXTO_SECUNDARIO, style="italic")
+
+        ax.set_title(f"{rotulo}  ·  exibido ≤ p{int(quantil_corte * 100)} ({corte:,.0f})",
+                     fontweight="bold", fontsize=10.5, loc="left", color=_COR_TEXTO_PRIMARIO)
+        ax.set_xlabel("")
+        ax.set_ylabel("")
+        ax.set_xticks(range(len(ordem)))
+        ax.set_xticklabels(ordem, fontsize=9.5)
+        ax.tick_params(axis="x", length=0)
+        ax.grid(axis="y", alpha=0.2)
+        ax.set_axisbelow(True)
+        sns.despine(ax=ax)
+
+    for ax in axes[n:]:
+        ax.set_visible(False)
+
+    fig.suptitle(titulo, fontweight="bold", fontsize=13, x=0.01, ha="left", y=0.985)
+    fig.text(0.01, 0.942, "Ponto branco = mediana · linhas tracejadas = quartis Q1/Q3 · largura = densidade relativa no grupo",
+             fontsize=9, color=_COR_TEXTO_SECUNDARIO, ha="left")
+    plt.tight_layout(rect=(0, 0, 1, 0.90))
+    _salvar_figura_opcional(fig, nome_arquivo=nome_arquivo, save_dir=save_dir)
+    return fig
+
+
+def _serie_diaria_arquetipos(
+    df_fraude: pd.DataFrame,
+    col_grupo: str,
+    col_dt: str,
+    ordem: List[str],
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Retorna (volume diário, prejuízo diário em US$) por arquétipo, com dias sem fraude = 0."""
+    df_real, _ = reverter_escala_log1p(df_fraude[[col_grupo, col_dt, "TransactionAmt"]], cols_contagem=[], verbose=False)
+    dt = df_real[col_dt].astype("float64")
+    df_real["_dia"] = np.floor((dt - dt.min()) / 86400.0).astype(int)
+    dias = pd.RangeIndex(0, int(df_real["_dia"].max()) + 1, name="Dia")
+
+    volume = (
+        df_real.groupby(["_dia", col_grupo], observed=True).size().unstack(fill_value=0)
+        .reindex(index=dias, columns=ordem, fill_value=0)
+    )
+    prejuizo = (
+        df_real.groupby(["_dia", col_grupo], observed=True)["TransactionAmt"].sum().unstack(fill_value=0.0)
+        .reindex(index=dias, columns=ordem, fill_value=0.0)
+    )
+    return volume, prejuizo
+
+
+def resumir_dinamica_temporal_arquetipos(
+    df_fraude: pd.DataFrame,
+    col_grupo: str = "arquetipo",
+    col_dt: str = "TransactionDT",
+    ordem: Optional[List[str]] = None,
+    limiar_cv_rajada: float = 0.8,
+    limiar_pico_mediana: float = 4.0,
+    limiar_tendencia_mes_pct: float = 15.0,
+) -> pd.DataFrame:
+    """Métricas de dinâmica temporal diária por arquétipo e classificação do perfil.
+
+    - `CV_Diario` (desvio/média) e `Pico/Mediana` medem rajadas (bursts);
+    - `Tendencia_%_mes`: inclinação da regressão linear do volume diário, em % da média a cada 30 dias.
+    Perfil: "Rajadas" se CV >= limiar_cv_rajada ou Pico/Mediana >= limiar_pico_mediana;
+    senão "Crescimento"/"Retração" se |tendência| >= limiar_tendencia_mes_pct; senão "Estável".
+    """
+    ordem = ordem or sorted(df_fraude[col_grupo].dropna().unique())
+    volume, prejuizo = _serie_diaria_arquetipos(df_fraude, col_grupo, col_dt, ordem)
+    dias = volume.index.values.astype("float64")
+
+    registros = []
+    for g in ordem:
+        s = volume[g].astype("float64")
+        media = float(s.mean())
+        mediana = float(s.median())
+        cv = float(s.std(ddof=0) / media) if media > 0 else np.nan
+        pico_mediana = float(s.max() / mediana) if mediana > 0 else np.inf
+        inclinacao = float(np.polyfit(dias, s.values, 1)[0]) if media > 0 else 0.0
+        tendencia = inclinacao * 30 / media * 100 if media > 0 else np.nan
+
+        if cv >= limiar_cv_rajada or pico_mediana >= limiar_pico_mediana:
+            perfil = "Rajadas (burst)"
+        elif tendencia >= limiar_tendencia_mes_pct:
+            perfil = "Crescimento"
+        elif tendencia <= -limiar_tendencia_mes_pct:
+            perfil = "Retração"
+        else:
+            perfil = "Estável"
+
+        registros.append({
+            "Arquetipo": g,
+            "Dias_Ativos_%": round(float((s > 0).mean() * 100), 1),
+            "Media_Diaria": round(media, 1),
+            "Mediana_Diaria": round(mediana, 1),
+            "Pico_Diario": int(s.max()),
+            "Dia_do_Pico": int(s.idxmax()),
+            "Pico/Mediana": round(pico_mediana, 2),
+            "CV_Diario": round(cv, 2),
+            "Tendencia_%_mes": round(tendencia, 1),
+            "Prejuizo_Medio_Diario_USD": round(float(prejuizo[g].mean()), 2),
+            "Perfil_Temporal": perfil,
+        })
+    return pd.DataFrame(registros)
+
+
+def plot_evolucao_temporal_arquetipos(
+    df_fraude: pd.DataFrame,
+    col_grupo: str = "arquetipo",
+    col_dt: str = "TransactionDT",
+    ordem: Optional[List[str]] = None,
+    paleta: Optional[Dict[str, str]] = None,
+    janela_mm: int = 7,
+    dias_por_bloco: int = 7,
+    titulo: str = "Dinâmica temporal dos arquétipos ao longo da janela de fraudes",
+    nome_arquivo: Optional[str] = None,
+    save_dir: Optional[Union[str, Path]] = None,
+) -> plt.Figure:
+    """Small multiples do volume diário (linha fina + média móvel) e participação semanal no prejuízo.
+
+    - Painéis 1..4: um por arquétipo, eixo Y próprio (rajadas ficam visíveis mesmo em grupos menores);
+      o pico diário é marcado com um ponto.
+    - Painel final: área 100% empilhada da participação de cada arquétipo no prejuízo (US$) por bloco
+      de `dias_por_bloco` dias — mostra quem ganha/perde relevância financeira no tempo.
+    """
+    import matplotlib.gridspec as gridspec
+
+    ordem = ordem or sorted(df_fraude[col_grupo].dropna().unique())
+    paleta = paleta or dict(zip(ordem, PALETA_ARQUETIPOS_PADRAO))
+    volume, prejuizo = _serie_diaria_arquetipos(df_fraude, col_grupo, col_dt, ordem)
+
+    n = len(ordem)
+    fig = plt.figure(figsize=(15, 1.75 * n + 3.6))
+    gs = gridspec.GridSpec(n + 1, 1, height_ratios=[1] * n + [1.9], hspace=0.55, figure=fig)
+    ax_ref = None
+
+    for i, g in enumerate(ordem):
+        ax = fig.add_subplot(gs[i], sharex=ax_ref) if ax_ref is not None else fig.add_subplot(gs[i])
+        ax_ref = ax_ref or ax
+        s = volume[g]
+        mm = s.rolling(janela_mm, center=True, min_periods=1).mean()
+        ax.plot(s.index, s.values, color=paleta[g], linewidth=0.8, alpha=0.35)
+        ax.plot(mm.index, mm.values, color=paleta[g], linewidth=2.0)
+        dia_pico = int(s.idxmax())
+        ax.scatter([dia_pico], [s.max()], s=40, color=paleta[g], edgecolor="white", linewidth=1.5, zorder=5)
+        ax.set_title(
+            f"{g}  ·  pico {int(s.max())} fraudes no dia {dia_pico}  ·  mediana {s.median():.0f}/dia",
+            loc="left", fontsize=10, fontweight="bold", color=_COR_TEXTO_PRIMARIO,
+        )
+        ax.set_ylim(0, s.max() * 1.15 if s.max() > 0 else 1)
+        ax.yaxis.set_major_locator(ticker.MaxNLocator(3, integer=True))
+        ax.grid(axis="y", alpha=0.2)
+        ax.tick_params(axis="x", labelbottom=False, length=0)
+        sns.despine(ax=ax)
+
+    # Participação semanal no prejuízo (US$), 100% empilhada
+    ax_sh = fig.add_subplot(gs[n], sharex=ax_ref)
+    bloco = (prejuizo.index // dias_por_bloco)
+    prej_bloco = prejuizo.groupby(bloco).sum()
+    share = prej_bloco.div(prej_bloco.sum(axis=1).replace(0, np.nan), axis=0).fillna(0) * 100
+    x_bloco = share.index.values * dias_por_bloco + dias_por_bloco / 2
+    ax_sh.stackplot(
+        x_bloco, *[share[g].values for g in ordem], labels=ordem,
+        colors=[paleta[g] for g in ordem], alpha=0.9, edgecolor="white", linewidth=1.0,
+    )
+    ax_sh.set_ylim(0, 100)
+    ax_sh.set_xlim(volume.index.min(), volume.index.max())
+    ax_sh.yaxis.set_major_formatter(ticker.FuncFormatter(lambda v, _: f"{v:.0f}%"))
+    ax_sh.set_ylabel("% do prejuízo", color=_COR_TEXTO_SECUNDARIO)
+    ax_sh.set_xlabel("Dias desde a primeira fraude da base (TransactionDT / 86.400)", color=_COR_TEXTO_SECUNDARIO)
+    ax_sh.set_title(f"Participação no prejuízo (US$) por bloco de {dias_por_bloco} dias",
+                    loc="left", fontsize=10, fontweight="bold", color=_COR_TEXTO_PRIMARIO)
+    ax_sh.legend(ncol=n, frameon=False, fontsize=9, loc="upper left", bbox_to_anchor=(0, -0.28))
+    sns.despine(ax=ax_sh)
+
+    fig.suptitle(titulo, fontweight="bold", fontsize=13, x=0.01, ha="left", y=0.995)
+    fig.text(0.01, 0.965, f"Volume diário de fraudes: linha fina = diário · linha grossa = média móvel {janela_mm} dias · ponto = pico",
+             fontsize=9, color=_COR_TEXTO_SECUNDARIO, ha="left")
+    fig.subplots_adjust(top=0.92, bottom=0.12, left=0.06, right=0.98)
+    _salvar_figura_opcional(fig, nome_arquivo=nome_arquivo, save_dir=save_dir)
+    return fig
+
+
+def plot_arquetipos_2d_plotly(
+    X_2d: np.ndarray,
+    arquetipos: Union[np.ndarray, pd.Series],
+    ordem: Optional[List[str]] = None,
+    paleta: Optional[Dict[str, str]] = None,
+    titulo: str = "Topologia UMAP 2D colorida pelos 4 arquétipos",
+    hover_df: Optional[pd.DataFrame] = None,
+    sample_plot: Optional[int] = 15000,
+    random_state: int = 42,
+    nome_arquivo: Optional[str] = None,
+    save_dir: Optional[Union[str, Path]] = None,
+) -> Any:
+    """Reaproveita `plot_clusters_2d_plotly` e aplica nomes/cores fixas dos arquétipos."""
+    arq = pd.Series(arquetipos).astype(str).reset_index(drop=True)
+    ordem = ordem or sorted(arq.unique())
+    paleta = paleta or {g: PALETA_ARQUETIPOS_PADRAO[i % len(PALETA_ARQUETIPOS_PADRAO)] for i, g in enumerate(ordem)}
+
+    fig = plot_clusters_2d_plotly(
+        X_2d, arq.values, titulo=titulo, hover_df=hover_df,
+        sample_plot=sample_plot, random_state=random_state,
+    )
+    ordem_idx = {g: i for i, g in enumerate(ordem)}
+
+    def _ajustar(trace):
+        nome = str(trace.name).replace("Cluster ", "", 1)
+        hover = (trace.hovertemplate or "").replace("Cluster=Cluster ", "Arquétipo=").replace("Cluster=", "Arquétipo=")
+        trace.update(
+            name=nome,
+            legendgroup=nome,
+            legendrank=ordem_idx.get(nome, 99),
+            marker_color=paleta.get(nome, COR_RUIDO_CLUSTER),
+            marker_size=4.5,
+            hovertemplate=hover,
+        )
+
+    fig.for_each_trace(_ajustar)
+    fig.update_layout(legend_title_text="Arquétipo", legend=dict(itemsizing="constant"))
+    _salvar_figura_opcional(fig, nome_arquivo=nome_arquivo, save_dir=save_dir)
+    return fig
+
+
+def verificar_disponibilidade_hdbscan(random_state: int = 42) -> Tuple[Optional[str], str]:
+    """Verifica, com um **ajuste real** em mini-array, qual backend HDBSCAN funciona no ambiente.
+
+    Apenas importar não basta: o pacote `hdbscan` pode importar e quebrar no `fit` por
+    incompatibilidade de versão com o scikit-learn (ex.: `force_all_finite` removido no sklearn >= 1.8).
+    Retorna `(backend, mensagem)`, com backend em {"hdbscan", "sklearn", None}:
+    - "hdbscan": pacote original (expõe DBCV via `relative_validity_`);
+    - "sklearn": `sklearn.cluster.HDBSCAN` (mesmo algoritmo, sem DBCV nativo);
+    - None: nenhum disponível.
+    """
+    X_teste = np.random.default_rng(random_state).normal(size=(60, 3))
+    falhas = []
+    try:
+        import hdbscan
+        hdbscan.HDBSCAN(min_cluster_size=5, gen_min_span_tree=True).fit_predict(X_teste)
+        versao = getattr(hdbscan, "__version__", "versão não informada")
+        return "hdbscan", f"Backend 'hdbscan' operacional ({versao}) — DBCV (relative_validity_) disponível."
+    except Exception as exc:  # ImportError, ABI do numpy ou API incompatível do sklearn
+        falhas.append(f"hdbscan -> {type(exc).__name__}: {exc}")
+    try:
+        from sklearn.cluster import HDBSCAN as SkHDBSCAN
+        SkHDBSCAN(min_cluster_size=5).fit_predict(X_teste)
+        import sklearn
+        return "sklearn", (
+            f"Pacote 'hdbscan' inoperante ({falhas[0]}). Usando fallback sklearn.cluster.HDBSCAN "
+            f"(sklearn {sklearn.__version__}) — sem DBCV nativo; critério de seleção = Silhouette."
+        )
+    except Exception as exc:
+        falhas.append(f"sklearn.cluster.HDBSCAN -> {type(exc).__name__}: {exc}")
+    return None, "Nenhum backend HDBSCAN disponível. Instale com `pip install hdbscan` ou atualize o scikit-learn (>= 1.3). " + " | ".join(falhas)
+
+
+def ajustar_hdbscan(
+    X_espaco: np.ndarray,
+    min_cluster_size: int,
+    min_samples: int,
+    cluster_selection_method: str = "eom",
+    backend: str = "hdbscan",
+) -> Tuple[np.ndarray, float, float]:
+    """Ajusta o HDBSCAN no backend informado e retorna (rótulos, DBCV, tempo em segundos).
+
+    DBCV só é exposto pelo pacote `hdbscan` (`relative_validity_`); no backend sklearn retorna NaN.
+    """
+    import time
+
+    t0 = time.perf_counter()
+    if backend == "hdbscan":
+        import hdbscan
+        modelo = hdbscan.HDBSCAN(
+            min_cluster_size=int(min_cluster_size),
+            min_samples=int(min_samples),
+            cluster_selection_method=cluster_selection_method,
+            gen_min_span_tree=True,
+        )
+        labels = modelo.fit_predict(X_espaco)
+        dbcv = float(getattr(modelo, "relative_validity_", np.nan))
+    elif backend == "sklearn":
+        from sklearn.cluster import HDBSCAN as SkHDBSCAN
+        labels = SkHDBSCAN(
+            min_cluster_size=int(min_cluster_size),
+            min_samples=int(min_samples),
+            cluster_selection_method=cluster_selection_method,
+        ).fit_predict(X_espaco)
+        dbcv = np.nan
+    else:
+        raise ValueError(f"Backend HDBSCAN inválido ou indisponível: {backend!r}")
+    return np.asarray(labels), dbcv, round(time.perf_counter() - t0, 2)
+
+
+def avaliar_viabilidade_hdbscan(
+    X_espaco: np.ndarray,
+    grade_min_cluster_size: Iterable[int] = (100, 200, 400),
+    grade_min_samples: Iterable[int] = (10, 30),
+    max_ruido_pct: float = 35.0,
+    min_clusters: int = 3,
+    max_clusters: int = 20,
+    backend: str = "hdbscan",
+    sample_size: Optional[int] = 10000,
+    random_state: int = 42,
+) -> pd.DataFrame:
+    """Grade enxuta do HDBSCAN com tempo de execução por configuração e critérios de viabilidade.
+
+    No backend "hdbscan" reaproveita `avaliar_grade_hdbscan` (uma chamada por combinação, para
+    cronometrar cada ajuste); no backend "sklearn" usa `ajustar_hdbscan` + `_avaliar_metricas_sem_ruido`.
+    Uma configuração é **viável** quando `%_Ruido <= max_ruido_pct` e
+    `min_clusters <= N_Clusters <= max_clusters` (evita colapso em 1-2 blobs ou pulverização em
+    micro-clusters sem leitura de negócio).
+    """
+    import time
+
+    linhas = []
+    for mcs in grade_min_cluster_size:
+        for ms in grade_min_samples:
+            t0 = time.perf_counter()
+            if backend == "hdbscan":
+                linha = avaliar_grade_hdbscan(
+                    X_espaco, grade_min_cluster_size=(int(mcs),), grade_min_samples=(int(ms),),
+                    gen_min_span_tree=True, sample_size=sample_size, random_state=random_state,
+                ).iloc[0].to_dict()
+            else:
+                labels, dbcv, _ = ajustar_hdbscan(X_espaco, int(mcs), int(ms), backend=backend)
+                m = _avaliar_metricas_sem_ruido(labels, X_espaco, sample_size=sample_size, random_state=random_state)
+                linha = {
+                    "min_cluster_size": int(mcs), "min_samples": int(ms),
+                    "N_Clusters": m["n_clusters"], "N_Ruido": m["n_ruido"], "%_Ruido": m["pct_ruido"],
+                    "DBCV": dbcv, "Silhouette": m["silhouette"],
+                    "Davies_Bouldin": m["davies_bouldin"], "Calinski_Harabasz": m["calinski_harabasz"],
+                }
+            linha["Tempo_s"] = round(time.perf_counter() - t0, 2)
+
+            motivos = []
+            if linha["%_Ruido"] > max_ruido_pct:
+                motivos.append(f"ruído {linha['%_Ruido']:.1f}% > {max_ruido_pct:.0f}%")
+            if linha["N_Clusters"] < min_clusters:
+                motivos.append(f"colapso ({linha['N_Clusters']} clusters < {min_clusters})")
+            if linha["N_Clusters"] > max_clusters:
+                motivos.append(f"micro-clusters ({linha['N_Clusters']} > {max_clusters})")
+            linha["Viavel"] = not motivos
+            linha["Motivo"] = "; ".join(motivos) if motivos else "OK"
+            linhas.append(linha)
+
+    df = pd.DataFrame(linhas)
+    for c in ["Silhouette", "Davies_Bouldin"]:
+        df[c] = df[c].astype(float).round(4)
+    df["Calinski_Harabasz"] = df["Calinski_Harabasz"].astype(float).round(1)
+    return df
+
+
+def selecionar_config_hdbscan(
+    df_viabilidade: pd.DataFrame,
+    criterio: str = "DBCV",
+) -> Tuple[pd.Series, bool]:
+    """Seleciona a melhor configuração: maior `criterio` entre as viáveis (desempate: menor ruído).
+
+    Se `criterio` estiver todo vazio (ex.: DBCV no backend sklearn), usa Silhouette.
+    Se nenhuma configuração for viável, retorna a de menor `%_Ruido` com >= 2 clusters e `viavel=False`.
+    """
+    if criterio not in df_viabilidade.columns or df_viabilidade[criterio].isna().all():
+        criterio = "Silhouette"
+    viaveis = df_viabilidade[df_viabilidade["Viavel"]]
+    if not viaveis.empty:
+        melhor = viaveis.sort_values([criterio, "%_Ruido"], ascending=[False, True], na_position="last").iloc[0]
+        return melhor, True
+    candidatos = df_viabilidade[df_viabilidade["N_Clusters"] >= 2]
+    base = candidatos if not candidatos.empty else df_viabilidade
+    return base.sort_values(["%_Ruido", criterio], ascending=[True, False], na_position="last").iloc[0], False
+
+
+def comparar_hdbscan_vs_arquetipos(
+    labels_hdbscan: np.ndarray,
+    arquetipos: Union[np.ndarray, pd.Series],
+    labels_kmeans: Optional[np.ndarray] = None,
+    ordem: Optional[List[str]] = None,
+) -> Dict[str, pd.DataFrame]:
+    """Concordância HDBSCAN x K-Means (arquétipos) e tabelas cruzadas.
+
+    Retorna dict com:
+    - `concordancia`: ARI/NMI do HDBSCAN (sem ruído -1) vs. 4 arquétipos e vs. K-Means K=10;
+    - `crosstab`: contagem HDBSCAN (linhas, inclui ruído) x arquétipo (colunas), com totais;
+    - `crosstab_pct`: % de cada cluster HDBSCAN em cada arquétipo + arquétipo dominante/pureza;
+    - `ruido_por_arquetipo`: quanto de cada arquétipo o HDBSCAN descarta como ruído.
+    """
+    from sklearn.metrics import adjusted_rand_score, normalized_mutual_info_score
+
+    hdb = np.asarray(labels_hdbscan)
+    arq = pd.Series(arquetipos).astype(str).reset_index(drop=True)
+    ordem = ordem or sorted(arq.unique())
+    mask = hdb != -1
+
+    linhas = []
+    referencias = {"4 Arquétipos (K-Means agrupado)": arq.values}
+    if labels_kmeans is not None:
+        referencias["K-Means K=10 (clusters originais)"] = np.asarray(labels_kmeans)
+    for nome, ref in referencias.items():
+        if mask.sum() > 0 and len(np.unique(hdb[mask])) > 1:
+            ari = adjusted_rand_score(ref[mask], hdb[mask])
+            nmi = normalized_mutual_info_score(ref[mask], hdb[mask])
+        else:
+            ari, nmi = np.nan, np.nan
+        linhas.append({
+            "Referencia": nome,
+            "Pontos_Comparados": int(mask.sum()),
+            "Cobertura_%": round(float(mask.mean() * 100), 2),
+            "ARI": round(float(ari), 4),
+            "NMI": round(float(nmi), 4),
+        })
+    concordancia = pd.DataFrame(linhas)
+
+    rotulo_hdb = pd.Series(np.where(hdb == -1, "Ruído (-1)", pd.Series(hdb).map(lambda c: f"HDB {c:02d}")), name="HDBSCAN")
+    ct = pd.crosstab(rotulo_hdb, arq.rename("Arquetipo")).reindex(columns=ordem, fill_value=0)
+    ordem_linhas = (["Ruído (-1)"] if "Ruído (-1)" in ct.index else []) + sorted(i for i in ct.index if i != "Ruído (-1)")
+    ct = ct.loc[ordem_linhas]
+
+    ct_pct = ct.div(ct.sum(axis=1), axis=0).mul(100).round(1)
+    ct_pct["Arquetipo_Dominante"] = ct.idxmax(axis=1)
+    ct_pct["Pureza_%"] = ct_pct[ordem].max(axis=1)
+    ct_pct["N"] = ct.sum(axis=1)
+
+    ct_total = ct.copy()
+    ct_total["Total"] = ct_total.sum(axis=1)
+    ct_total.loc["Total"] = ct_total.sum(axis=0)
+
+    n_ruido_total = int((~mask).sum())
+    ruido = pd.DataFrame({
+        "N_Arquetipo": arq.value_counts().reindex(ordem).fillna(0).astype(int),
+        "N_Ruido": arq[~mask].value_counts().reindex(ordem).fillna(0).astype(int),
+    })
+    ruido["%_do_Arquetipo_em_Ruido"] = (ruido["N_Ruido"] / ruido["N_Arquetipo"].replace(0, np.nan) * 100).round(1)
+    ruido["%_do_Ruido_Total"] = (ruido["N_Ruido"] / max(n_ruido_total, 1) * 100).round(1)
+    ruido.index.name = "Arquetipo"
+
+    return {
+        "concordancia": concordancia,
+        "crosstab": ct_total,
+        "crosstab_pct": ct_pct,
+        "ruido_por_arquetipo": ruido.reset_index(),
+    }
+
+
+def plot_crosstab_hdbscan_arquetipos(
+    crosstab_pct: pd.DataFrame,
+    ordem: Optional[List[str]] = None,
+    titulo: str = "Para qual arquétipo cada cluster HDBSCAN aponta? (% da linha)",
+    nome_arquivo: Optional[str] = None,
+    save_dir: Optional[Union[str, Path]] = None,
+) -> plt.Figure:
+    """Heatmap sequencial (um matiz) da composição de cada cluster HDBSCAN pelos 4 arquétipos."""
+    cols = ordem or [c for c in crosstab_pct.columns if c not in ("Arquetipo_Dominante", "Pureza_%", "N")]
+    dados = crosstab_pct[cols].astype(float)
+    rotulos_linha = [f"{idx}  (n={int(n):,})" for idx, n in zip(dados.index, crosstab_pct["N"])]
+
+    fig, ax = plt.subplots(figsize=(1.9 * len(cols) + 3.5, 0.42 * len(dados) + 1.8))
+    sns.heatmap(
+        dados, cmap="Blues", vmin=0, vmax=100, annot=True, fmt=".0f", linewidths=1.5, linecolor="white",
+        cbar_kws={"label": "% do cluster HDBSCAN", "shrink": 0.8}, annot_kws={"fontsize": 9}, ax=ax,
+    )
+    ax.set_yticklabels(rotulos_linha, rotation=0, fontsize=9)
+    ax.set_xticklabels(cols, rotation=0, fontsize=9.5)
+    ax.set_xlabel("")
+    ax.set_ylabel("")
+    ax.tick_params(length=0)
+    ax.set_title(titulo, fontweight="bold", fontsize=12, loc="left", pad=12)
+    plt.tight_layout()
+    _salvar_figura_opcional(fig, nome_arquivo=nome_arquivo, save_dir=save_dir)
+    return fig
+
+
+def veredito_viabilidade_hdbscan(
+    metricas_hdbscan: Dict[str, Any],
+    metricas_referencia: Dict[str, Any],
+    tempo_s: float,
+    max_ruido_pct: float = 35.0,
+    min_clusters: int = 3,
+    max_clusters: int = 20,
+    max_tempo_s: float = 300.0,
+) -> pd.DataFrame:
+    """Checklist objetivo de viabilidade do HDBSCAN frente à referência (K-Means K=10).
+
+    Critérios eliminatórios: ruído, nº de clusters e tempo. Critério de ganho (agregação):
+    Silhouette (sem ruído) e Davies-Bouldin melhores que a referência no mesmo espaço.
+    """
+    sil_h, sil_r = metricas_hdbscan.get("Silhouette", np.nan), metricas_referencia.get("Silhouette", np.nan)
+    db_h, db_r = metricas_hdbscan.get("Davies_Bouldin", np.nan), metricas_referencia.get("Davies_Bouldin", np.nan)
+    n_cl = metricas_hdbscan.get("N_Clusters", 0)
+    ruido = metricas_hdbscan.get("%_Ruido", 100.0)
+
+    def _status(ok: bool) -> str:
+        return "✅ Atende" if ok else "❌ Não atende"
+
+    linhas = [
+        ("Eliminatório", "% de ruído (-1)", f"{ruido:.1f}%", f"<= {max_ruido_pct:.0f}%", _status(ruido <= max_ruido_pct)),
+        ("Eliminatório", "Nº de clusters", f"{n_cl}", f"{min_clusters}–{max_clusters}", _status(min_clusters <= n_cl <= max_clusters)),
+        ("Eliminatório", "Tempo do ajuste final", f"{tempo_s:.1f} s", f"<= {max_tempo_s:.0f} s", _status(tempo_s <= max_tempo_s)),
+        ("Ganho", "Silhouette (sem ruído) ↑", f"{sil_h:.4f}", f"> K-Means ({sil_r:.4f})", _status(bool(sil_h > sil_r))),
+        ("Ganho", "Davies-Bouldin (sem ruído) ↓", f"{db_h:.4f}", f"< K-Means ({db_r:.4f})", _status(bool(db_h < db_r))),
+    ]
+    df = pd.DataFrame(linhas, columns=["Tipo", "Critério", "HDBSCAN", "Limite / Referência", "Status"])
+
+    eliminatorios_ok = df.loc[df["Tipo"] == "Eliminatório", "Status"].str.startswith("✅").all()
+    ganhos = int(df.loc[df["Tipo"] == "Ganho", "Status"].str.startswith("✅").sum())
+    if not eliminatorios_ok:
+        veredito = "INVIÁVEL — falha em critério eliminatório; manter K-Means (4 arquétipos) como segmentação oficial."
+    elif ganhos == 2:
+        veredito = "VIÁVEL E AGREGADOR — supera o K-Means nas métricas internas; avaliar uso complementar."
+    else:
+        veredito = "VIÁVEL, MAS NÃO AGREGADOR — roda, porém não supera o K-Means; usar apenas como diagnóstico (ruído = outliers)."
+    df.attrs["veredito"] = veredito
+    return df
+
+
+# ==============================================================================
+# AVALIAÇÃO OUT-OF-TIME (04_Avaliacao.ipynb): PERFORMANCE, DRIFT, SHAP E CLUSTERS
+# ------------------------------------------------------------------------------
+# Funções portadas do caderno 04_Model_Avaliation (Projeto_06 / src/plots.py,
+# src/drift.py e src/model_utils.py) e adaptadas para:
+#   - problema de FRAUDE (isFraud) com artefato calibrado + threshold dinâmico;
+#   - comparação In-Time (Treino OOF + Validação) x Out-of-Time;
+#   - identidade visual corporativa em paleta AZUL.
+# ==============================================================================
+from matplotlib.colors import LinearSegmentedColormap as _LinearSegmentedColormap
+
+PALETA_AZUL: Dict[str, str] = {
+    'marinho': '#0B2545',      # foco principal (OOT, fraude, destaque máximo)
+    'principal': '#13579B',
+    'medio': '#3E7CC4',
+    'ciano': '#0096C7',        # destaque ciano corporativo
+    'ciano_claro': '#48CAE4',  # apoio ciano claro
+    'claro': '#8DB6E3',        # referência (In-Time)
+    'gelo': '#E6F0FA',
+    'cinza': '#97A3B0',        # legítimas / contexto
+    'cinza_claro': '#D9DEE4',
+    'texto': '#1B2633',
+    'texto_sec': '#5A6878',
+    'grade': '#EBEFF3',
+    'acento': '#0096C7',       # destaque ciano para alertas (drift crítico, pior grupo)
+}
+COR_IN_TIME = PALETA_AZUL['claro']
+COR_OOT = PALETA_AZUL['marinho']
+COR_LEGITIMA = PALETA_AZUL['cinza']
+COR_FRAUDE = PALETA_AZUL['principal']
+CMAP_AZUL = _LinearSegmentedColormap.from_list('azul_corporativo', ['#F5F9FD', '#8DB6E3', '#13579B', '#0B2545'])
+CMAP_AZUL_SHAP = _LinearSegmentedColormap.from_list('azul_shap', ['#A9C9EC', '#3E7CC4', '#0B2545'])
+_CORES_PARTICAO = {'Treino (OOF)': '#FFFFFF', 'Validação': PALETA_AZUL['gelo'], 'OOT': '#D3E3F5'}
+
+
+def aplicar_estilo_azul() -> None:
+    """Aplica o tema visual corporativo (minimalista, paleta azul) em todos os gráficos Matplotlib/Seaborn."""
+    from cycler import cycler
+    p = PALETA_AZUL
+    plt.rcParams.update({
+        'figure.facecolor': 'white', 'axes.facecolor': 'white', 'savefig.facecolor': 'white',
+        'figure.dpi': 110, 'savefig.dpi': 300, 'savefig.bbox': 'tight',
+        'font.family': 'DejaVu Sans', 'font.size': 10,
+        'axes.edgecolor': p['cinza_claro'], 'axes.linewidth': 1.0,
+        'axes.spines.top': False, 'axes.spines.right': False,
+        'axes.grid': True, 'axes.axisbelow': True,
+        'grid.color': p['grade'], 'grid.linewidth': 0.8, 'grid.linestyle': '-',
+        'axes.titlesize': 13, 'axes.titleweight': 'bold', 'axes.titlelocation': 'left',
+        'axes.titlepad': 12, 'axes.titlecolor': p['texto'],
+        'axes.labelsize': 10.5, 'axes.labelcolor': p['texto_sec'], 'axes.labelpad': 8,
+        'xtick.color': p['texto_sec'], 'ytick.color': p['texto_sec'],
+        'xtick.major.size': 0, 'ytick.major.size': 0,
+        'legend.frameon': False, 'legend.fontsize': 9.5,
+        'axes.prop_cycle': cycler(color=[p['marinho'], p['principal'], p['ciano'], p['claro'], p['cinza']]),
+    })
+
+
+def _titulo_ax(ax, titulo: str, subtitulo: Optional[str] = None) -> None:
+    """Título à esquerda em negrito com subtítulo opcional em cinza logo abaixo."""
+    ax.set_title(titulo, loc='left', pad=26 if subtitulo else 12)
+    if subtitulo:
+        ax.text(0, 1.02, subtitulo, transform=ax.transAxes, fontsize=9.5,
+                color=PALETA_AZUL['texto_sec'], ha='left', va='bottom')
+
+
+def _titulo_fig(fig, titulo: str, subtitulo: Optional[str] = None) -> None:
+    fig.suptitle(titulo, x=0.01, ha='left', va='bottom', y=1.045 if subtitulo else 1.01,
+                 fontsize=15, fontweight='bold', color=PALETA_AZUL['texto'])
+    if subtitulo:
+        fig.text(0.01, 1.01, subtitulo, ha='left', va='bottom', fontsize=10, color=PALETA_AZUL['texto_sec'])
+
+
+def _salvar_fig(fig, filepath: Optional[Union[str, Path]] = None) -> None:
+    """Salva a figura (quando `filepath` é informado) e exibe."""
+    if filepath is not None:
+        caminho = Path(filepath)
+        caminho.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(caminho, dpi=300, bbox_inches='tight', facecolor='white')
+    plt.show()
+
+
+def _status_psi(psi: float) -> str:
+    if psi < 0.10:
+        return 'Estável'
+    if psi < 0.25:
+        return 'Alerta'
+    return 'Crítico'
+
+
+# ------------------------------------------------------------------------------
+# 1. ESCORAGEM DAS PARTIÇÕES (In-Time = Treino OOF + Validação | OOT)
+# ------------------------------------------------------------------------------
+def gerar_scores_oof_treino(artefato: Dict[str, Any], X_train: pd.DataFrame, y_train, groups, n_splits: int = 4) -> np.ndarray:
+    """
+    Probabilidade BRUTA Out-of-Fold no Treino com os MESMOS hiperparâmetros do artefato.
+
+    O artefato foi ajustado em 100% do Treino: escorar o Treino com ele seria in-sample
+    (GINI artificialmente alto). Reproduz o `GroupKFold` mensal do 02_Modelagem
+    (mesmos grupos e n_splits do ajuste do calibrador), garantindo um score honesto.
+    """
+    from sklearn.base import clone
+
+    X_ = X_train[artefato['features']]
+    y_ = pd.Series(np.asarray(y_train)).reset_index(drop=True)
+    gkf = GroupKFold(n_splits=min(n_splits, len(np.unique(groups))))
+    oof = np.zeros(len(X_), dtype=float)
+    for i, (tr_idx, va_idx) in enumerate(gkf.split(X_, y_, groups=groups), start=1):
+        m = clone(artefato['modelo'])
+        m.fit(X_.iloc[tr_idx], y_.iloc[tr_idx])
+        oof[va_idx] = m.predict_proba(X_.iloc[va_idx])[:, 1]
+        print(f"  [OOF] fold {i}/{gkf.get_n_splits()} concluído | {len(va_idx):,} transações escoradas")
+    return oof
+
+
+def escorar_particao(
+    artefato: Dict[str, Any], X: pd.DataFrame, df_ref: pd.DataFrame, particao: str, janela: str,
+    prob_raw: Optional[np.ndarray] = None, col_target: str = 'isFraud', col_amt: str = 'TransactionAmt',
+) -> pd.DataFrame:
+    """
+    Aplica o artefato final (prob. bruta -> calibrada -> threshold dinâmico por ticket) em uma partição.
+    Se `prob_raw` for informado (ex.: OOF do Treino), ele substitui a predição do modelo final.
+    Retorna um DataFrame por transação, alinhado ao índice de `df_ref`.
+    """
+    regra = artefato['regra_decisao']
+    amt = obter_amt_real(df_ref, col_amt)
+    if prob_raw is None:
+        prob_raw = artefato['modelo'].predict_proba(X[artefato['features']])[:, 1]
+    prob_raw = np.asarray(prob_raw, dtype=float)
+    prob_cal = artefato['calibrador'].transform(prob_raw)
+    th = threshold_dinamico(amt, regra['t_min'], regra['t_max'], regra['k'])
+    ids = df_ref['TransactionID'].values if 'TransactionID' in df_ref.columns else df_ref.index.values
+    return pd.DataFrame({
+        'TransactionID': ids,
+        'TransactionDT': df_ref['TransactionDT'].values,
+        'Particao': particao,
+        'Janela': janela,
+        'isFraud': np.asarray(df_ref[col_target]).astype(int),
+        'amt_usd': amt,
+        'prob_raw': prob_raw,
+        'prob_cal': prob_cal,
+        'threshold': th,
+        'bloquear': prob_cal >= th,
+    }, index=df_ref.index)
+
+
+def adicionar_bloco_temporal(df_scores: pd.DataFrame, dt_inicio: float, dias_por_bloco: int = 7,
+                             nome_coluna: str = 'semana') -> pd.DataFrame:
+    """Cria o índice do bloco temporal (ex.: semana) relativo ao início da base completa."""
+    df = df_scores.copy()
+    df[nome_coluna] = ((df['TransactionDT'] - dt_inicio) // (dias_por_bloco * 86400)).astype(int)
+    return df
+
+
+# ------------------------------------------------------------------------------
+# 2. PERFORMANCE GLOBAL (TABELA DE MÉTRICAS + MATRIZES DE CONFUSÃO)
+# ------------------------------------------------------------------------------
+_LAYOUT_METRICAS_JANELAS = [
+    # (chave, rótulo, tipo, delta comparável entre bases?)
+    ('Transações', 'Transações', 'int', False),
+    ('Taxa Fraude', 'Taxa de Fraude', 'pct', True),
+    ('ROC-AUC', 'ROC-AUC', 'prob', True),
+    ('GINI', 'GINI', 'prob', True),
+    ('KS', 'KS', 'prob', True),
+    ('PR-AUC', 'PR-AUC', 'prob', True),
+    ('Precision', 'Precision', 'pct', True),
+    ('Recall', 'Recall', 'pct', True),
+    ('F1-Score', 'F1-Score', 'prob', True),
+    ('Aprovação', 'Aprovação (Legítimas)', 'pct', True),
+    ('Aceitação Geral', 'Aceitação Geral', 'pct', True),
+    ('Qtd_VP', 'Fraudes Barradas (VP)', 'int', False),
+    ('Qtd_FP', 'Legítimas Bloqueadas (FP)', 'int', False),
+    ('Qtd_FN', 'Fraudes Aprovadas (FN)', 'int', False),
+    ('Chargeback FN', 'Chargeback FN (US$)', 'usd', False),
+    ('Lucro Líquido', 'Lucro Líquido (US$)', 'usd', False),
+    ('Lucro Sem Modelo', 'Lucro Sem Modelo (US$)', 'usd', False),
+    ('Lucro por Transação', 'Lucro por Transação (US$)', 'usd3', True),
+    ('Margem s/ Volume', 'Margem s/ Volume', 'pct', True),
+]
+
+
+def tabela_metricas_janelas(bases: Dict[str, pd.DataFrame], ref: str = 'In-Time', alvo: str = 'OOT') -> pd.DataFrame:
+    """
+    Métricas de ranqueamento (prob. bruta), da regra dinâmica e financeiras para cada base
+    (DataFrames gerados por `escorar_particao`) + coluna Δ (alvo − ref). Sem cross-validation:
+    cada base é avaliada uma única vez com o artefato congelado.
+    """
+    metricas = {
+        nome: _metricas_particao_unica(d['isFraud'], d['prob_raw'], d['bloquear'], d['amt_usd'])
+        for nome, d in bases.items()
+    }
+    df = pd.DataFrame(metricas)
+    df[f'Δ ({alvo} − {ref})'] = df[alvo] - df[ref]
+    return df
+
+
+def formatar_tabela_metricas(df_metricas: pd.DataFrame, destacar: str = 'OOT'):
+    """Formata a tabela de `tabela_metricas_janelas` (tipos por linha) e destaca a coluna OOT em azul."""
+    col_delta = [c for c in df_metricas.columns if c.startswith('Δ')]
+    fmt = {'prob': '{:.4f}', 'pct': '{:.2%}', 'int': '{:,.0f}', 'usd': '$ {:,.0f}', 'usd3': '$ {:,.3f}'}
+    fmt_d = {'prob': '{:+.4f}', 'pct': '{:+.2f} p.p.', 'usd3': '$ {:+,.3f}'}
+    linhas = {}
+    for chave, rotulo, tipo, tem_delta in _LAYOUT_METRICAS_JANELAS:
+        if chave not in df_metricas.index:
+            continue
+        reg = {}
+        for c in df_metricas.columns:
+            v = df_metricas.loc[chave, c]
+            if c in col_delta:
+                if not tem_delta or pd.isna(v):
+                    reg[c] = '—'
+                else:
+                    reg[c] = fmt_d.get(tipo, '{:+.4f}').format(v * 100 if tipo == 'pct' else v)
+            else:
+                reg[c] = fmt[tipo].format(v)
+        linhas[rotulo] = reg
+    df_fmt = pd.DataFrame(linhas).T
+    df_fmt.index.name = 'Métrica'
+    estilo = df_fmt.style.set_properties(**{'text-align': 'right'})
+    if destacar in df_fmt.columns:
+        estilo = estilo.set_properties(subset=[destacar], **{
+            'background-color': PALETA_AZUL['gelo'], 'font-weight': 'bold', 'color': PALETA_AZUL['marinho']})
+    return estilo
+
+
+def plot_matrizes_confusao_janelas(bases: Dict[str, pd.DataFrame], figsize: Tuple[float, float] = (13, 5.2),
+                                   filepath: Optional[Union[str, Path]] = None) -> pd.DataFrame:
+    """Matrizes de confusão lado a lado (regra dinâmica) com % da classe real e contagens absolutas."""
+    fig, axes = plt.subplots(1, len(bases), figsize=figsize)
+    axes = np.atleast_1d(axes)
+    registros = []
+    nomes_q = [('VN', 'Legítima aprovada'), ('FP', 'Falso alarme'), ('FN', 'Fraude aprovada'), ('VP', 'Fraude barrada')]
+    for ax, (nome, d) in zip(axes, bases.items()):
+        cm = confusion_matrix(d['isFraud'], d['bloquear'].astype(int), labels=[0, 1])
+        tn, fp, fn, tp = cm.ravel()
+        pct = np.array([[tn / max(1, tn + fp), fp / max(1, tn + fp)], [fn / max(1, fn + tp), tp / max(1, fn + tp)]])
+        sns.heatmap(pct, cmap=CMAP_AZUL, vmin=0, vmax=1, cbar=False, linewidths=4, linecolor='white', ax=ax, annot=False)
+        for i, (sig, desc) in enumerate(nomes_q):
+            r, c = divmod(i, 2)
+            n_abs = [tn, fp, fn, tp][i]
+            cor = 'white' if pct[r, c] > 0.5 else PALETA_AZUL['texto']
+            ax.text(c + 0.5, r + 0.42, f"{pct[r, c]:.1%}", ha='center', va='center', fontsize=17, fontweight='bold', color=cor)
+            ax.text(c + 0.5, r + 0.66, f"{sig} · {desc}\nn = {n_abs:,}", ha='center', va='center', fontsize=9, color=cor)
+            registros.append({'Base': nome, 'Classe Real': 'Fraude (1)' if r else 'Legítima (0)', 'Decisão': f"{sig} — {desc}",
+                              'Transações': int(n_abs), '% da Classe': pct[r, c]})
+        ax.set_xticklabels(['Aprovada', 'Bloqueada'], fontsize=10.5, fontweight='bold')
+        ax.set_yticklabels(['Legítima', 'Fraude'], fontsize=10.5, fontweight='bold', rotation=0, va='center')
+        ax.set_xlabel('Decisão do modelo (threshold dinâmico)')
+        ax.set_ylabel('Classe real' if ax is axes[0] else '')
+        ax.grid(False)
+        _titulo_ax(ax, nome, f"{len(d):,} transações | fraude {d['isFraud'].mean():.2%}")
+    _titulo_fig(fig, 'Matriz de Confusão — In-Time vs. Out-of-Time',
+                'Percentual sobre a classe real (linhas somam 100%)')
+    plt.tight_layout()
+    _salvar_fig(fig, filepath)
+    return pd.DataFrame(registros).set_index(['Base', 'Classe Real', 'Decisão'])
+
+
+# ------------------------------------------------------------------------------
+# 3. CAPACIDADE DE DISCRIMINAÇÃO (ROC / PR), SEPARAÇÃO (KDE) E KS
+# ------------------------------------------------------------------------------
+def plot_roc_pr_janelas(y_it, p_it, y_oot, p_oot, figsize: Tuple[float, float] = (15, 6),
+                        filepath: Optional[Union[str, Path]] = None) -> Dict[str, float]:
+    """
+    Curvas ROC e Precision-Recall sobrepostas (In-Time em azul claro, OOT em azul marinho).
+    Portada de `plot_curva_roc` / `plot_curva_pr` (Projeto_06) com a paleta corporativa azul.
+    """
+    from sklearn.metrics import roc_curve, precision_recall_curve
+    y_it, y_oot = np.asarray(y_it), np.asarray(y_oot)
+    fpr_i, tpr_i, _ = roc_curve(y_it, p_it)
+    fpr_o, tpr_o, _ = roc_curve(y_oot, p_oot)
+    auc_i, auc_o = roc_auc_score(y_it, p_it), roc_auc_score(y_oot, p_oot)
+    pre_i, rec_i, _ = precision_recall_curve(y_it, p_it)
+    pre_o, rec_o, _ = precision_recall_curve(y_oot, p_oot)
+    ap_i, ap_o = average_precision_score(y_it, p_it), average_precision_score(y_oot, p_oot)
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
+    ax1.plot([0, 1], [0, 1], ls='--', lw=1.2, color=PALETA_AZUL['cinza_claro'], label='Aleatório (AUC = 0.50)')
+    ax1.plot(fpr_i, tpr_i, color=COR_IN_TIME, lw=2.6, label=f'In-Time   | AUC = {auc_i:.4f} · GINI = {2*auc_i-1:.4f}')
+    ax1.plot(fpr_o, tpr_o, color=COR_OOT, lw=2.8, label=f'OOT        | AUC = {auc_o:.4f} · GINI = {2*auc_o-1:.4f}')
+    ax1.fill_between(fpr_o, tpr_o, color=COR_OOT, alpha=0.05)
+    ax1.set(xlim=(-0.01, 1.01), ylim=(-0.01, 1.02), xlabel='Taxa de Falsos Positivos (legítimas bloqueadas)',
+            ylabel='Taxa de Verdadeiros Positivos (Recall)')
+    ax1.legend(loc='lower right', fontsize=10)
+    _titulo_ax(ax1, 'Curva ROC', f'ΔAUC (OOT − In-Time) = {auc_o - auc_i:+.4f}')
+
+    ax2.plot(rec_i, pre_i, color=COR_IN_TIME, lw=2.4, label=f'In-Time | PR-AUC = {ap_i:.4f}')
+    ax2.plot(rec_o, pre_o, color=COR_OOT, lw=2.6, label=f'OOT      | PR-AUC = {ap_o:.4f}')
+    ax2.axhline(y_it.mean(), color=COR_IN_TIME, ls=':', lw=1.4, label=f'Prevalência In-Time ({y_it.mean():.2%})')
+    ax2.axhline(y_oot.mean(), color=COR_OOT, ls=':', lw=1.4, label=f'Prevalência OOT ({y_oot.mean():.2%})')
+    ax2.set(xlim=(-0.01, 1.01), ylim=(-0.01, 1.02), xlabel='Recall (fraudes capturadas)', ylabel='Precision (acerto no bloqueio)')
+    ax2.legend(loc='upper right', fontsize=9.5)
+    _titulo_ax(ax2, 'Curva Precision-Recall', 'Mais sensível ao desbalanceamento — a linha pontilhada é o modelo aleatório')
+
+    _titulo_fig(fig, 'Estabilidade da Discriminação — In-Time vs. Out-of-Time')
+    plt.tight_layout()
+    _salvar_fig(fig, filepath)
+    return {'auc_in_time': float(auc_i), 'auc_oot': float(auc_o), 'pr_auc_in_time': float(ap_i), 'pr_auc_oot': float(ap_o)}
+
+
+def plot_kde_scores_janelas(y_it, p_it, y_oot, p_oot, faixa_corte: Optional[Tuple[float, float]] = None,
+                            calibrador=None, amostra_max: int = 60000, random_state: int = 42,
+                            figsize: Tuple[float, float] = (16, 5.8), filepath: Optional[Union[str, Path]] = None) -> None:
+    """
+    Separação de risco (KDE) Legítima x Fraude em cada janela (portada de `plot_distribuicao_kde_scores`).
+    `faixa_corte` = (corte p/ alto ticket, corte p/ micro-compra) na MESMA escala do score plotado:
+    a regra dinâmica varia com o valor, então o corte é uma faixa sombreada, não uma linha.
+    Amostragem estratificada por classe (`amostra_max`) apenas para acelerar o KDE.
+    `calibrador` (isotônica): se informado, adiciona um eixo X superior com a probabilidade CALIBRADA
+    equivalente a cada posição do score bruto (é nessa escala que t_min/t_max da regra são definidos).
+    """
+    rng = np.random.default_rng(random_state)
+    fig, axes = plt.subplots(1, 2, figsize=figsize, sharey=True)
+    for ax, (y, p, nome) in zip(axes, [(y_it, p_it, 'In-Time'), (y_oot, p_oot, 'Out-of-Time (OOT)')]):
+        y, p = np.asarray(y), np.asarray(p, dtype=float)
+        for classe, cor, rotulo, alpha, lw in [(0, COR_LEGITIMA, 'Legítima (0)', 0.18, 2.0), (1, COR_FRAUDE, 'Fraude (1)', 0.30, 2.6)]:
+            s = p[y == classe]
+            if len(s) > amostra_max:
+                s = rng.choice(s, amostra_max, replace=False)
+            sns.kdeplot(x=s, ax=ax, color=cor, fill=True, alpha=alpha, lw=lw, clip=(0, 1), cut=0,
+                        label=f'{rotulo} · mediana {np.median(p[y == classe]):.3f}')
+        if faixa_corte is not None:
+            lo, hi = faixa_corte
+            ax.axvspan(lo, hi, color=PALETA_AZUL['acento'], alpha=0.12, lw=0, label=f'Faixa do corte dinâmico [{lo:.3f} – {hi:.3f}]')
+            ax.axvline(lo, color=PALETA_AZUL['acento'], lw=1.0, ls='--', alpha=0.8)
+            ax.axvline(hi, color=PALETA_AZUL['acento'], lw=1.0, ls='--', alpha=0.8)
+        ks = ks_2samp(p[y == 1], p[y == 0]).statistic
+        ax.set(xlim=(0, 1), xlabel='Score do modelo (probabilidade bruta)')
+        ax.set_ylabel('Densidade' if ax is axes[0] else '')
+        ax.set_ylim(0, ax.get_ylim()[1] * 1.3)
+        ax.legend(loc='upper right', fontsize=9.5, frameon=True, facecolor='white', edgecolor='white', framealpha=0.9)
+        if calibrador is not None:
+            ax_cal = ax.twiny()
+            ax_cal.set_xlim(ax.get_xlim())
+            ticks_raw = np.linspace(0, 1, 6)
+            fmt_cal = lambda v: f'{v:.1%}' if v < 0.10 else f'{v:.0%}'
+            rotulos = [fmt_cal(v) for v in np.clip(calibrador.predict(ticks_raw), 0, 1)]
+            if faixa_corte is not None:
+                # Um único rótulo para a faixa (t_min – t_max) evita sobreposição quando ela é estreita
+                centro = float(np.mean(faixa_corte))
+                manter = np.abs(ticks_raw - centro) > 0.12
+                lo_cal, hi_cal = np.clip(calibrador.predict(np.asarray(faixa_corte)), 0, 1)
+                ticks_raw = np.r_[ticks_raw[manter], centro]
+                rotulos = [r for r, m in zip(rotulos, manter) if m] + [f'corte {fmt_cal(lo_cal)}–{fmt_cal(hi_cal)}']
+            ax_cal.set_xticks(ticks_raw)
+            ax_cal.set_xticklabels(rotulos, fontsize=8.5, color=PALETA_AZUL['texto_sec'])
+            if faixa_corte is not None:
+                lbl = ax_cal.get_xticklabels()[-1]
+                lbl.set_color(PALETA_AZUL['acento'])
+                lbl.set_fontweight('bold')
+            ax_cal.set_xlabel('Probabilidade calibrada equivalente (escala real de fraude)', fontsize=9,
+                              color=PALETA_AZUL['texto_sec'], labelpad=6)
+            ax_cal.grid(False)
+            ax_cal.tick_params(axis='x', length=3, pad=2)
+            # Título/subtítulo acima do eixo calibrado (sem sobrepor os rótulos do eixo superior)
+            ax.set_title(nome, loc='left', pad=58)
+            ax.annotate(f'{len(p):,} transações | KS = {ks:.4f}', xy=(0, 1), xycoords='axes fraction',
+                        xytext=(0, 40), textcoords='offset points', fontsize=9.5,
+                        color=PALETA_AZUL['texto_sec'], ha='left', va='bottom')
+        else:
+            _titulo_ax(ax, nome, f'{len(p):,} transações | KS = {ks:.4f}')
+    _titulo_fig(fig, 'Separação de Risco (KDE) — Distribuição dos Scores por Classe',
+                'Quanto menor a sobreposição entre as áreas, melhor o modelo separa fraude de legítima')
+    plt.tight_layout()
+    _salvar_fig(fig, filepath)
+
+
+def plot_cdf_ks_janelas(y_it, p_it, y_oot, p_oot, figsize: Tuple[float, float] = (16, 5.8),
+                        filepath: Optional[Union[str, Path]] = None) -> Tuple[float, float]:
+    """
+    CDFs empíricas Legítima x Fraude e ponto de separação máxima (KS) em cada janela.
+    Portada de `plot_cdf_ks`. Retorna (KS In-Time, KS OOT) em escala 0–1.
+    """
+    fig, axes = plt.subplots(1, 2, figsize=figsize, sharey=True)
+    ks_res = []
+    for ax, (y, p, nome) in zip(axes, [(y_it, p_it, 'In-Time'), (y_oot, p_oot, 'Out-of-Time (OOT)')]):
+        y, p = np.asarray(y), np.asarray(p, dtype=float)
+        s0, s1 = np.sort(p[y == 0]), np.sort(p[y == 1])
+        grade = np.unique(p)
+        cdf0 = np.searchsorted(s0, grade, side='right') / len(s0)
+        cdf1 = np.searchsorted(s1, grade, side='right') / len(s1)
+        diff = np.abs(cdf0 - cdf1)
+        i_ks = int(np.argmax(diff))
+        x_ks, ks = grade[i_ks], float(diff[i_ks])
+        ks_res.append(ks)
+        ax.plot(grade, cdf0, color=COR_LEGITIMA, lw=2.4, label='CDF Legítima (0)')
+        ax.plot(grade, cdf1, color=COR_FRAUDE, lw=2.6, label='CDF Fraude (1)')
+        ax.fill_between(grade, cdf1, cdf0, where=cdf0 >= cdf1, color=PALETA_AZUL['claro'], alpha=0.15)
+        ax.vlines(x_ks, min(cdf0[i_ks], cdf1[i_ks]), max(cdf0[i_ks], cdf1[i_ks]), color=COR_OOT, lw=2.2, ls='--',
+                  label=f'KS = {ks:.4f}')
+        ax.plot([x_ks, x_ks], [cdf0[i_ks], cdf1[i_ks]], 'o', color=COR_OOT, ms=6)
+        ax.annotate(f'KS máx. = {ks:.1%}\nscore = {x_ks:.3f}', xy=(x_ks, (cdf0[i_ks] + cdf1[i_ks]) / 2),
+                    xytext=(min(x_ks + 0.12, 0.75), 0.35), fontsize=10, fontweight='bold', color=COR_OOT,
+                    arrowprops=dict(arrowstyle='-|>', color=COR_OOT, lw=1.1, connectionstyle='arc3,rad=.2'),
+                    bbox=dict(boxstyle='round,pad=0.4', facecolor='white', edgecolor=PALETA_AZUL['cinza_claro']))
+        ax.set(xlim=(0, 1), ylim=(-0.01, 1.02), xlabel='Score do modelo (probabilidade bruta)')
+        ax.set_ylabel('Proporção acumulada (CDF)' if ax is axes[0] else '')
+        ax.legend(loc='lower right', fontsize=10)
+        _titulo_ax(ax, nome)
+    _titulo_fig(fig, 'Kolmogorov-Smirnov (KS) — Separação Máxima entre Legítimas e Fraudes',
+                f'ΔKS (OOT − In-Time) = {ks_res[1] - ks_res[0]:+.4f}')
+    plt.tight_layout()
+    _salvar_fig(fig, filepath)
+    return ks_res[0], ks_res[1]
+
+
+def gerar_tabela_decis_ks(y_true, prob, n_decis: int = 10) -> pd.DataFrame:
+    """
+    Tabela de ordenação de risco por decis de score (Decil 10 = maior risco), portada do Projeto_06:
+    taxa de fraude, captura acumulada de fraudes a partir do topo, KS acumulado e Lift.
+    """
+    df = pd.DataFrame({'y': np.asarray(y_true).astype(int), 'score': np.asarray(prob, dtype=float)})
+    df['decil'] = pd.qcut(df['score'].rank(method='first'), q=n_decis, labels=False) + 1
+    tab = df.groupby('decil').agg(transacoes=('y', 'size'), fraudes=('y', 'sum'),
+                                  score_min=('score', 'min'), score_medio=('score', 'mean'),
+                                  score_max=('score', 'max')).reset_index()
+    tab['legitimas'] = tab['transacoes'] - tab['fraudes']
+    tab['taxa_fraude_pct'] = tab['fraudes'] / tab['transacoes'] * 100
+    tab = tab.sort_values('decil', ascending=False).reset_index(drop=True)
+    tab['captura_fraudes_acum_pct'] = tab['fraudes'].cumsum() / tab['fraudes'].sum() * 100
+    tab['legitimas_acum_pct'] = tab['legitimas'].cumsum() / tab['legitimas'].sum() * 100
+    tab['ks_pct'] = (tab['captura_fraudes_acum_pct'] - tab['legitimas_acum_pct']).abs()
+    tab['lift'] = tab['taxa_fraude_pct'] / (df['y'].mean() * 100)
+    return tab.sort_values('decil').reset_index(drop=True)
+
+
+def plot_decis_janelas(tab_it: pd.DataFrame, tab_oot: pd.DataFrame, figsize: Tuple[float, float] = (16, 5.6),
+                       filepath: Optional[Union[str, Path]] = None) -> None:
+    """Escada de risco (taxa de fraude por decil) e curva de ganho (captura acumulada) In-Time x OOT."""
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
+    x = tab_it['decil'].values
+    w = 0.38
+    b1 = ax1.bar(x - w / 2, tab_it['taxa_fraude_pct'], width=w, color=COR_IN_TIME, label='In-Time')
+    b2 = ax1.bar(x + w / 2, tab_oot['taxa_fraude_pct'], width=w, color=COR_OOT, label='OOT')
+    for bar, v in zip(b2, tab_oot['taxa_fraude_pct']):
+        ax1.text(bar.get_x() + bar.get_width() / 2, v, f'{v:.1f}%', ha='center', va='bottom', fontsize=8.5,
+                 fontweight='bold', color=COR_OOT)
+    ax1.set(xticks=x, xlabel='Decil de score (10 = maior risco)', ylabel='Taxa de fraude (%)')
+    ax1.grid(axis='x', visible=False)
+    ax1.legend(loc='upper left')
+    _titulo_ax(ax1, 'Escada de Risco por Decil', 'Monotonicidade = o modelo ordena o risco corretamente')
+
+    pct_pop = np.arange(1, len(x) + 1) * 100 / len(x)
+    cap_it = tab_it.sort_values('decil', ascending=False)['captura_fraudes_acum_pct'].values
+    cap_oot = tab_oot.sort_values('decil', ascending=False)['captura_fraudes_acum_pct'].values
+    ax2.plot([0, 100], [0, 100], ls='--', color=PALETA_AZUL['cinza_claro'], lw=1.2, label='Aleatório')
+    ax2.plot(np.r_[0, pct_pop], np.r_[0, cap_it], color=COR_IN_TIME, lw=2.4, marker='o', ms=5, label='In-Time')
+    ax2.plot(np.r_[0, pct_pop], np.r_[0, cap_oot], color=COR_OOT, lw=2.6, marker='o', ms=5, label='OOT')
+    ax2.annotate(f'Top 10%: {cap_oot[0]:.1f}% das fraudes', xy=(10, cap_oot[0]), xytext=(22, cap_oot[0] - 18),
+                 fontsize=10, fontweight='bold', color=COR_OOT,
+                 arrowprops=dict(arrowstyle='-|>', color=COR_OOT, lw=1.1))
+    ax2.set(xlim=(0, 101), ylim=(0, 102), xlabel='% da população (ordenada do maior para o menor score)',
+            ylabel='% das fraudes capturadas')
+    ax2.legend(loc='lower right')
+    _titulo_ax(ax2, 'Curva de Ganho (Captura Acumulada)', 'Quanto mais "colada" ao canto superior esquerdo, melhor')
+    plt.tight_layout()
+    _salvar_fig(fig, filepath)
+
+
+# ------------------------------------------------------------------------------
+# 4. INTERPRETABILIDADE (SHAP)
+# ------------------------------------------------------------------------------
+def calcular_shap_lgbm(modelo, X: pd.DataFrame, n_amostra: int = 20000, random_state: int = 42) -> Tuple[np.ndarray, pd.DataFrame]:
+    """SHAP values (classe positiva, log-odds) via TreeExplainer em uma amostra de `X`."""
+    if shap is None:
+        raise ImportError("Pacote 'shap' não encontrado. Instale com `pip install shap`.")
+    Xs = X.sample(n=min(n_amostra, len(X)), random_state=random_state)
+    sv = shap.TreeExplainer(modelo).shap_values(Xs)
+    if isinstance(sv, list):
+        sv = sv[1]
+    sv = np.asarray(sv)
+    if sv.ndim == 3:
+        sv = sv[:, :, 1]
+    return sv, Xs
+
+
+def ranking_shap(shap_values: np.ndarray, features: Iterable[str]) -> pd.DataFrame:
+    """Ranking global por |SHAP| médio (da variável mais para a menos relevante)."""
+    df = pd.DataFrame({'Feature': list(features), 'SHAP_medio_abs': np.abs(shap_values).mean(axis=0)})
+    df = df.sort_values('SHAP_medio_abs', ascending=False).reset_index(drop=True)
+    df['Rank'] = np.arange(1, len(df) + 1)
+    df['%_Impacto'] = df['SHAP_medio_abs'] / df['SHAP_medio_abs'].sum() * 100
+    return df
+
+
+def plot_importancia_shap(df_rank: pd.DataFrame, top_n: int = 15, n_destaque: int = 3,
+                          titulo: str = 'Impacto Global das Variáveis (|SHAP| médio)', subtitulo: Optional[str] = None,
+                          figsize: Tuple[float, float] = (11, 7.5), filepath: Optional[Union[str, Path]] = None) -> pd.DataFrame:
+    """Ranking horizontal de |SHAP|: Top `n_destaque` em azul marinho, demais em azul claro (portada de `plot_importancia_shap`)."""
+    top = df_rank.head(top_n).iloc[::-1]
+    cores = [COR_OOT if i >= len(top) - n_destaque else PALETA_AZUL['claro'] for i in range(len(top))]
+    fig, ax = plt.subplots(figsize=figsize)
+    bars = ax.barh(top['Feature'], top['SHAP_medio_abs'], color=cores, height=0.68)
+    ax.bar_label(bars, fmt='%.4f', padding=5, fontsize=9.5, fontweight='bold', color=PALETA_AZUL['texto'])
+    ax.set_xlim(0, top['SHAP_medio_abs'].max() * 1.18)
+    ax.set_xlabel('Impacto médio na predição (|SHAP|, log-odds)')
+    ax.grid(axis='y', visible=False)
+    _titulo_ax(ax, titulo, subtitulo)
+    plt.tight_layout()
+    _salvar_fig(fig, filepath)
+    return df_rank.head(top_n)
+
+
+def plot_shap_beeswarm(shap_values: np.ndarray, X_amostra: pd.DataFrame, top_n: int = 15,
+                       titulo: str = 'Direção do Impacto (SHAP Beeswarm)', filepath: Optional[Union[str, Path]] = None) -> None:
+    """Beeswarm SHAP com colormap azul (claro = valor baixo da feature, marinho = valor alto)."""
+    shap.summary_plot(shap_values, X_amostra, max_display=top_n, cmap=CMAP_AZUL_SHAP, show=False,
+                      plot_size=(11, 0.45 * top_n + 1.8), color_bar_label='Valor da feature')
+    fig = plt.gcf()
+    ax = fig.axes[0]
+    if len(fig.axes) > 1:
+        try:
+            fig.axes[-1].set_yticklabels(['Baixo', 'Alto'])
+        except Exception:
+            pass
+    ax.set_xlabel('SHAP value (impacto no log-odds de fraude)')
+    _titulo_ax(ax, titulo, 'Cada ponto é uma transação · à direita do zero = empurra para FRAUDE')
+    _salvar_fig(fig, filepath)
+
+
+def plot_shap_janelas(df_rank_it: pd.DataFrame, df_rank_oot: pd.DataFrame, top_n: int = 15,
+                      figsize: Tuple[float, float] = (11, 7.5), filepath: Optional[Union[str, Path]] = None) -> pd.DataFrame:
+    """
+    Dumbbell In-Time x OOT do |SHAP| médio (top N do OOT). Mostra se os motores de decisão
+    do modelo continuam os mesmos fora do tempo. Retorna a tabela comparativa com a correlação de Spearman.
+    """
+    m = df_rank_oot[['Feature', 'SHAP_medio_abs', 'Rank']].merge(
+        df_rank_it[['Feature', 'SHAP_medio_abs', 'Rank']], on='Feature', suffixes=('_OOT', '_InTime'))
+    m['Δ_Rank'] = m['Rank_InTime'] - m['Rank_OOT']
+    m['Δ_%'] = (m['SHAP_medio_abs_OOT'] / m['SHAP_medio_abs_InTime'].replace(0, np.nan) - 1) * 100
+    rho = stats.spearmanr(m['SHAP_medio_abs_InTime'], m['SHAP_medio_abs_OOT']).correlation
+    top = m.sort_values('SHAP_medio_abs_OOT', ascending=False).head(top_n).iloc[::-1]
+    y = np.arange(len(top))
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.hlines(y, top['SHAP_medio_abs_InTime'], top['SHAP_medio_abs_OOT'], color=PALETA_AZUL['cinza_claro'], lw=3, zorder=1)
+    ax.scatter(top['SHAP_medio_abs_InTime'], y, s=70, color=COR_IN_TIME, zorder=2, label='In-Time')
+    ax.scatter(top['SHAP_medio_abs_OOT'], y, s=80, color=COR_OOT, zorder=3, label='OOT')
+    for yi, (_, r) in zip(y, top.iterrows()):
+        if abs(r['Δ_Rank']) >= 3:
+            ax.text(max(r['SHAP_medio_abs_OOT'], r['SHAP_medio_abs_InTime']) * 1.03, yi,
+                    f"rank {int(r['Rank_InTime'])}→{int(r['Rank_OOT'])}", va='center', fontsize=8.5,
+                    color=PALETA_AZUL['acento'], fontweight='bold')
+    ax.set_yticks(y)
+    ax.set_yticklabels(top['Feature'])
+    ax.set_xlabel('|SHAP| médio')
+    ax.grid(axis='y', visible=False)
+    ax.legend(loc='lower right')
+    _titulo_ax(ax, 'Estabilidade dos Motores de Decisão — |SHAP| In-Time vs. OOT',
+               f'Correlação de Spearman entre os rankings = {rho:.3f} · em laranja: variáveis que mudaram ≥ 3 posições')
+    plt.tight_layout()
+    _salvar_fig(fig, filepath)
+    m.attrs['spearman'] = float(rho)
+    return m.sort_values('Rank_OOT').reset_index(drop=True)
+
+
+# ------------------------------------------------------------------------------
+# 5. DRIFT: TARGET, PSI DO SCORE, PSI DAS FEATURES E ESTABILIDADE TEMPORAL
+# ------------------------------------------------------------------------------
+def tabela_temporal(df_scores: pd.DataFrame, col_bloco: str = 'semana', min_fraudes: int = 30,
+                    min_transacoes: int = 1000) -> pd.DataFrame:
+    """
+    Métricas por bloco temporal (ex.: semana): volume, taxa de fraude, ROC-AUC, GINI, KS, PR-AUC,
+    Recall, Precision e Aprovação. Partição/Janela do bloco = a majoritária (blocos de fronteira).
+    Blocos com poucas fraudes/transações recebem NaN nas métricas de ranqueamento.
+    """
+    linhas = []
+    for b, d in df_scores.groupby(col_bloco, sort=True):
+        y, p = d['isFraud'].values, d['prob_raw'].values
+        n_f = int(y.sum())
+        valido = (n_f >= min_fraudes) and (len(d) >= min_transacoes) and (n_f < len(d))
+        auc = roc_auc_score(y, p) if valido else np.nan
+        r = calcular_score_financeiro(y, d['bloquear'].values, d['amt_usd'].values)
+        linhas.append({
+            col_bloco: int(b),
+            'Particao': d['Particao'].value_counts().idxmax(),
+            'Janela': d['Janela'].value_counts().idxmax(),
+            'Transacoes': len(d),
+            'Fraudes': n_f,
+            'Taxa_Fraude_%': y.mean() * 100,
+            'ROC_AUC': auc,
+            'GINI': 2 * auc - 1 if valido else np.nan,
+            'KS': ks_2samp(p[y == 1], p[y == 0]).statistic if valido else np.nan,
+            'PR_AUC': average_precision_score(y, p) if valido else np.nan,
+            'Recall_%': r['Recall'] * 100,
+            'Precision_%': r['Precision'] * 100,
+            'Aprovacao_%': r['Approval_Rate'] * 100,
+            'Lucro_USD': r['Resultado_Liquido'],
+        })
+    return pd.DataFrame(linhas)
+
+
+def _sombrear_particoes(ax, df_temp: pd.DataFrame, col_bloco: str) -> None:
+    """Fundo por partição (Validação = gelo, OOT = azul suave) com rótulo no topo do gráfico."""
+    for part, cor in _CORES_PARTICAO.items():
+        blocos = df_temp.loc[df_temp['Particao'] == part, col_bloco]
+        if blocos.empty:
+            continue
+        x0, x1 = blocos.min() - 0.5, blocos.max() + 0.5
+        if part != 'Treino (OOF)':
+            ax.axvspan(x0, x1, color=cor, alpha=0.6, lw=0, zorder=0)
+        ax.text((x0 + x1) / 2, 0.97, part.upper(), transform=ax.get_xaxis_transform(), ha='center', va='top',
+                fontsize=9, fontweight='bold', color=COR_OOT if part == 'OOT' else PALETA_AZUL['texto_sec'])
+
+
+def _linhas_media_janela(ax, df_temp: pd.DataFrame, col_bloco: str, col_valor: str, fmt: str) -> Dict[str, float]:
+    medias = {}
+    for jan, cor in [('In-Time', PALETA_AZUL['medio']), ('OOT', COR_OOT)]:
+        d = df_temp[df_temp['Janela'] == jan].dropna(subset=[col_valor])
+        if d.empty:
+            continue
+        med = float(np.average(d[col_valor], weights=d['Transacoes']))
+        medias[jan] = med
+        ax.hlines(med, d[col_bloco].min() - 0.4, d[col_bloco].max() + 0.4, colors=cor, linestyles='--', lw=1.6, zorder=2)
+        caixa = dict(boxstyle='round,pad=0.25', facecolor='white', edgecolor='none', alpha=0.85)
+        if jan == 'OOT':
+            ax.annotate(f'média {jan}\n{fmt.format(med)}', xy=(d[col_bloco].max() + 0.4, med), xytext=(10, 0),
+                        textcoords='offset points', va='center', ha='left', fontsize=9, fontweight='bold',
+                        color=cor, bbox=caixa, zorder=5)
+        else:
+            ax.annotate(f'média {jan}: {fmt.format(med)}', xy=(d[col_bloco].min() - 0.4, med), xytext=(2, 9),
+                        textcoords='offset points', va='bottom', ha='left', fontsize=9, fontweight='bold',
+                        color=cor, bbox=caixa, zorder=2.5)
+    return medias
+
+
+def plot_target_drift_temporal(df_temp: pd.DataFrame, col_bloco: str = 'semana', rotulo_bloco: str = 'Semana',
+                               figsize: Tuple[float, float] = (15, 5.8), filepath: Optional[Union[str, Path]] = None) -> Dict[str, float]:
+    """
+    Target drift: taxa de fraude (%) por bloco temporal ao longo de Treino → Validação → OOT
+    (portada de `plot_target_drift_mensal`), com volume em barras ao fundo e médias por janela.
+    """
+    fig, ax = plt.subplots(figsize=figsize)
+    ax_vol = ax.twinx()
+    ax_vol.bar(df_temp[col_bloco], df_temp['Transacoes'], width=0.75, color=PALETA_AZUL['cinza_claro'], alpha=0.45, zorder=0)
+    ax_vol.set_ylim(0, df_temp['Transacoes'].max() * 3.2)
+    ax_vol.set_yticks([])
+    ax_vol.grid(False)
+    for s in ax_vol.spines.values():
+        s.set_visible(False)
+    ax.set_zorder(ax_vol.get_zorder() + 1)
+    ax.patch.set_visible(False)
+
+    _sombrear_particoes(ax, df_temp, col_bloco)
+    ax.plot(df_temp[col_bloco], df_temp['Taxa_Fraude_%'], color=COR_OOT, lw=2.6, marker='o', ms=6, zorder=3,
+            markerfacecolor='white', markeredgewidth=2)
+    medias = _linhas_media_janela(ax, df_temp, col_bloco, 'Taxa_Fraude_%', '{:.2f}%')
+    i_max = df_temp['Taxa_Fraude_%'].idxmax()
+    ax.annotate(f"pico {df_temp.loc[i_max, 'Taxa_Fraude_%']:.2f}%",
+                xy=(df_temp.loc[i_max, col_bloco], df_temp.loc[i_max, 'Taxa_Fraude_%']), xytext=(0, 10),
+                textcoords='offset points', ha='center', fontsize=9, fontweight='bold', color=COR_OOT)
+    ax.set_xlabel(f'{rotulo_bloco} (desde o início da base) · barras cinza = volume de transações')
+    ax.set_ylabel('Taxa de fraude (%)')
+    ax.set_xlim(df_temp[col_bloco].min() - 0.6, df_temp[col_bloco].max() + 2.6)
+    ymax = df_temp['Taxa_Fraude_%'].max()
+    ax.set_ylim(0, ymax * 1.30)
+    sub = (f"Variação da média OOT vs. In-Time: {medias['OOT'] - medias['In-Time']:+.2f} p.p. "
+           f"({(medias['OOT'] / medias['In-Time'] - 1) * 100:+.1f}% relativo)") if len(medias) == 2 else None
+    _titulo_ax(ax, 'Target Drift — Taxa de Fraude ao Longo do Tempo', sub)
+    plt.tight_layout()
+    _salvar_fig(fig, filepath)
+    return medias
+
+
+def teste_qui_quadrado_temporal(tabela: pd.DataFrame, col_eventos: str = 'Fraudes', col_volume: str = 'Transacoes',
+                                rotulo: str = '') -> Dict[str, float]:
+    """
+    Qui-quadrado de independência (período x target) + V de Cramér como tamanho do efeito.
+    Portada de `src/drift.py` recebendo contagens diretamente (eventos e volume por linha).
+    """
+    cont = pd.DataFrame({'eventos': tabela[col_eventos].astype(int),
+                         'nao_eventos': (tabela[col_volume] - tabela[col_eventos]).astype(int)})
+    chi2, p, gl, esperado = stats.chi2_contingency(cont.values)
+    n = cont.values.sum()
+    k = min(cont.shape) - 1
+    v = float(np.sqrt(chi2 / (n * k))) if n * k > 0 else float('nan')
+    forca = 'desprezível' if v < 0.05 else ('fraco' if v < 0.10 else ('moderado' if v < 0.30 else 'forte'))
+    print(f"[Qui²{' — ' + rotulo if rotulo else ''}] χ² = {chi2:,.2f} | gl = {gl} | p-valor = {p:.2e} | "
+          f"V de Cramér = {v:.4f} (efeito {forca})")
+    return {'chi2': float(chi2), 'p_valor': float(p), 'gl': int(gl), 'freq_esperada_min': float(esperado.min()),
+            'cramers_v': v, 'efeito': forca}
+
+
+def calcular_psi_scores(score_ref, score_atual, bins: int = 10) -> Tuple[pd.DataFrame, float]:
+    """
+    PSI do SCORE com faixas pelos decis da referência (In-Time). Portada de `src/drift.py`.
+    Retorna a tabela por faixa (com a contribuição de cada faixa) e o PSI total.
+    """
+    score_ref = pd.Series(np.asarray(score_ref, dtype=float))
+    score_atual = pd.Series(np.asarray(score_atual, dtype=float))
+    limites = np.unique(np.quantile(score_ref, np.linspace(0, 1, bins + 1)))
+    limites[0], limites[-1] = -np.inf, np.inf
+    ref = pd.cut(score_ref, bins=limites).value_counts(sort=False) / len(score_ref)
+    atu = pd.cut(score_atual, bins=limites).value_counts(sort=False) / len(score_atual)
+    df = pd.DataFrame({'Faixa': [f'D{i + 1}' for i in range(len(ref))],
+                       'Limite_Sup': limites[1:], 'InTime_%': ref.values, 'OOT_%': atu.values})
+    df[['InTime_%', 'OOT_%']] = df[['InTime_%', 'OOT_%']].clip(lower=1e-4)
+    df['PSI'] = (df['OOT_%'] - df['InTime_%']) * np.log(df['OOT_%'] / df['InTime_%'])
+    psi = float(df['PSI'].sum())
+    print(f"[PSI do Score] PSI = {psi:.4f} → {_status_psi(psi)}")
+    return df, psi
+
+
+def plot_psi_score_faixas(df_psi: pd.DataFrame, psi_total: float, figsize: Tuple[float, float] = (13, 5.2),
+                          rotulo_atual: str = 'OOT',
+                          filepath: Optional[Union[str, Path]] = None) -> None:
+    """Distribuição da população por faixa de score (decis In-Time): In-Time x janela atual, com o PSI de cada faixa."""
+    fig, ax = plt.subplots(figsize=figsize)
+    x = np.arange(len(df_psi))
+    w = 0.38
+    ax.bar(x - w / 2, df_psi['InTime_%'] * 100, width=w, color=COR_IN_TIME, label='In-Time')
+    ax.bar(x + w / 2, df_psi['OOT_%'] * 100, width=w, color=COR_OOT, label=rotulo_atual)
+    topo = max(df_psi['InTime_%'].max(), df_psi['OOT_%'].max()) * 100
+    y_rot = topo * 1.12
+    for xi, psi_f in zip(x, df_psi['PSI']):
+        ax.text(xi, y_rot, f'{psi_f:.4f}', ha='center', va='bottom', fontsize=8.5,
+                color=PALETA_AZUL['acento'] if psi_f > 0.01 else PALETA_AZUL['texto_sec'], fontweight='bold')
+    ax.text(-0.55, y_rot, 'PSI faixa →', ha='right', va='bottom', fontsize=8.5, color=PALETA_AZUL['texto_sec'])
+    ax.set(xticks=x, xticklabels=df_psi['Faixa'], ylim=(0, topo * 1.45), xlim=(-1.3, len(x) - 0.4),
+           xlabel='Faixa de score (decis da janela In-Time · D10 = maior risco)', ylabel='% da população')
+    ax.grid(axis='x', visible=False)
+    ax.legend(loc='upper center', ncol=2, frameon=True, facecolor='white', edgecolor='white', framealpha=0.9)
+    _titulo_ax(ax, f'PSI do Score — {psi_total:.4f} ({_status_psi(psi_total)})',
+               f'Por construção, cada decil In-Time tem 10% da população; desvios de {rotulo_atual} indicam mudança no perfil de risco')
+    plt.tight_layout()
+    _salvar_fig(fig, filepath)
+
+
+def relatorio_psi_features(X_ref: pd.DataFrame, X_atual: pd.DataFrame, features: Optional[List[str]] = None,
+                           bins: int = 10) -> pd.DataFrame:
+    """
+    PSI e KS de deslocamento para TODAS as features numéricas (inclui float32/int32 do `safe_downcast`).
+    Retorna valores numéricos (não strings) com o status regulatório.
+    """
+    features = features or list(X_ref.select_dtypes(include=[np.number]).columns)
+    linhas = []
+    for col in features:
+        a, b = X_ref[col].astype('float64'), X_atual[col].astype('float64')
+        psi = float(calcular_psi(a, b, bins=bins))
+        a_, b_ = a.dropna(), b.dropna()
+        ks = float(ks_2samp(a_, b_).statistic) if len(a_) and len(b_) else np.nan
+        linhas.append({'Feature': col, 'PSI': psi, 'KS_shift': ks, 'Status': _status_psi(psi),
+                       '%_Nulos_InTime': a.isna().mean() * 100, '%_Nulos_OOT': b.isna().mean() * 100})
+    return pd.DataFrame(linhas).sort_values('PSI', ascending=False).reset_index(drop=True)
+
+
+def plot_psi_vs_shap(df_psi: pd.DataFrame, df_rank_shap: pd.DataFrame, n_rotulos: int = 8,
+                     figsize: Tuple[float, float] = (13, 6.5), filepath: Optional[Union[str, Path]] = None) -> pd.DataFrame:
+    """
+    Matriz Drift x Importância: eixo X = |SHAP| médio, eixo Y = PSI.
+    O quadrante superior direito (drift alto em variável importante) é o risco real para o modelo.
+    Retorna a tabela combinada com o `Risco_Drift` = PSI × %Impacto SHAP.
+    """
+    m = df_psi.merge(df_rank_shap[['Feature', 'SHAP_medio_abs', '%_Impacto', 'Rank']], on='Feature', how='inner')
+    m['Risco_Drift'] = m['PSI'] * m['%_Impacto']
+    m = m.sort_values('Risco_Drift', ascending=False).reset_index(drop=True)
+    cores = m['Status'].map({'Estável': PALETA_AZUL['claro'], 'Alerta': PALETA_AZUL['principal'],
+                             'Crítico': PALETA_AZUL['acento']})
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.axhspan(0.25, max(0.3, m['PSI'].max() * 1.15), color=PALETA_AZUL['acento'], alpha=0.06, lw=0)
+    ax.axhspan(0.10, 0.25, color=PALETA_AZUL['gelo'], alpha=0.9, lw=0)
+    ax.axhline(0.10, color=PALETA_AZUL['principal'], ls='--', lw=1)
+    ax.axhline(0.25, color=PALETA_AZUL['acento'], ls='--', lw=1)
+    ax.scatter(m['SHAP_medio_abs'], m['PSI'], s=40 + 600 * m['%_Impacto'] / m['%_Impacto'].max(), c=cores,
+               edgecolor='white', lw=1.2, zorder=3, alpha=0.95)
+    for i, (_, r) in enumerate(m.head(n_rotulos).iterrows()):
+        ax.annotate(r['Feature'], (r['SHAP_medio_abs'], r['PSI']), xytext=(6, 6 if i % 2 == 0 else -13),
+                    textcoords='offset points',
+                    fontsize=9, fontweight='bold', color=PALETA_AZUL['texto'])
+    ax.text(1.0, 0.25, ' Crítico (PSI > 0.25)', transform=ax.get_yaxis_transform(), va='bottom', ha='right',
+            fontsize=9, color=PALETA_AZUL['acento'], fontweight='bold')
+    ax.text(1.0, 0.10, ' Alerta (PSI > 0.10)', transform=ax.get_yaxis_transform(), va='bottom', ha='right',
+            fontsize=9, color=PALETA_AZUL['principal'], fontweight='bold')
+    ax.set(xlabel='Importância no modelo (|SHAP| médio)', ylabel='PSI (In-Time → OOT)',
+           ylim=(0, max(0.3, m['PSI'].max() * 1.15)))
+    _titulo_ax(ax, 'Matriz Drift × Importância das Features',
+               'Tamanho do ponto = % do impacto SHAP · rótulos = maior risco (PSI × importância)')
+    plt.tight_layout()
+    _salvar_fig(fig, filepath)
+    return m
+
+
+def plot_comparativo_psi_features(X_ref: pd.DataFrame, X_atual: pd.DataFrame, features: List[str], bins: int = 10,
+                                  rotulo_atual: str = 'OOT',
+                                  figsize: Tuple[float, float] = (16, 4.8), filepath: Optional[Union[str, Path]] = None) -> None:
+    """Distribuição In-Time x janela atual das features selecionadas, com PSI e status no título (portada do Projeto_06)."""
+    fig, axes = plt.subplots(1, len(features), figsize=figsize)
+    axes = np.atleast_1d(axes)
+    for ax, feat in zip(axes, features):
+        a, b = X_ref[feat].astype('float64').dropna(), X_atual[feat].astype('float64').dropna()
+        psi = calcular_psi(a, b, bins=bins)
+        lo = min(np.percentile(a, 1), np.percentile(b, 1))
+        hi = max(np.percentile(a, 99), np.percentile(b, 99))
+        a_, b_ = a[(a >= lo) & (a <= hi)], b[(b >= lo) & (b <= hi)]
+        discreta = pd.concat([a_, b_]).nunique() <= 25
+        if discreta:
+            vals = np.sort(pd.concat([a_, b_]).unique())
+            pa = a_.value_counts(normalize=True).reindex(vals, fill_value=0)
+            pb = b_.value_counts(normalize=True).reindex(vals, fill_value=0)
+            xi = np.arange(len(vals))
+            ax.bar(xi - 0.2, pa.values, width=0.4, color=COR_IN_TIME, label='In-Time')
+            ax.bar(xi + 0.2, pb.values, width=0.4, color=COR_OOT, label=rotulo_atual)
+            passo = max(1, len(vals) // 8)
+            ax.set_xticks(xi[::passo])
+            ax.set_xticklabels([f'{v:g}' for v in vals[::passo]])
+            ax.set_ylabel('Proporção' if ax is axes[0] else '')
+        else:
+            sns.kdeplot(a_.sample(min(len(a_), 60000), random_state=0), ax=ax, color=COR_IN_TIME, fill=True, alpha=0.30, lw=2.2, label='In-Time')
+            sns.kdeplot(b_.sample(min(len(b_), 60000), random_state=0), ax=ax, color=COR_OOT, fill=True, alpha=0.20, lw=2.4, label=rotulo_atual)
+            ax.set_ylabel('Densidade' if ax is axes[0] else '')
+        status = _status_psi(psi)
+        cor = PALETA_AZUL['acento'] if status == 'Crítico' else (PALETA_AZUL['principal'] if status == 'Alerta' else PALETA_AZUL['texto'])
+        ax.set_title(f'{feat}\nPSI = {psi:.4f} · {status}', loc='left', fontsize=11.5, color=cor)
+        ax.set_xlabel('Valor da feature (p1–p99)')
+        ax.legend(loc='upper right', fontsize=9)
+    _titulo_fig(fig, 'Feature Drift — Variáveis com Maior Risco de Deslocamento')
+    plt.tight_layout()
+    _salvar_fig(fig, filepath)
+
+
+def plot_gini_temporal(df_temp: pd.DataFrame, col_bloco: str = 'semana', rotulo_bloco: str = 'Semana',
+                       piso_gini: Optional[float] = None, figsize: Tuple[float, float] = (15, 5.8),
+                       filepath: Optional[Union[str, Path]] = None) -> Dict[str, float]:
+    """
+    Estabilidade do GINI por bloco temporal (Treino OOF → Validação → OOT), portada de
+    `plot_estabilidade_gini_temporal`: partições sombreadas, médias ponderadas por janela e piso opcional.
+    """
+    d = df_temp.dropna(subset=['GINI'])
+    fig, ax = plt.subplots(figsize=figsize)
+    _sombrear_particoes(ax, df_temp, col_bloco)
+    ax.plot(d[col_bloco], d['GINI'], color=COR_OOT, lw=2.6, marker='o', ms=6, markerfacecolor='white',
+            markeredgewidth=2, zorder=3, label='GINI semanal')
+    for _, r in d.iterrows():
+        ax.text(r[col_bloco], r['GINI'] + 0.012, f"{r['GINI']:.2f}", ha='center', fontsize=7.8, color=PALETA_AZUL['texto_sec'])
+    medias = _linhas_media_janela(ax, d, col_bloco, 'GINI', '{:.3f}')
+    if piso_gini is not None:
+        ax.axhline(piso_gini, color=PALETA_AZUL['acento'], lw=1.3, ls=':', zorder=2)
+        ax.annotate(f'piso de aceitação ({piso_gini:.2f})', xy=(d[col_bloco].min() - 0.4, piso_gini), xytext=(2, -9),
+                    textcoords='offset points', va='top', ha='left', fontsize=9, color=PALETA_AZUL['acento'],
+                    fontweight='bold', bbox=dict(boxstyle='round,pad=0.25', facecolor='white', edgecolor='none',
+                                                 alpha=0.85), zorder=5)
+    lo = np.nanmin([d['GINI'].min(), piso_gini if piso_gini is not None else np.inf])
+    ax.set_ylim(max(0, lo - 0.10), min(1.02, d['GINI'].max() + 0.12))
+    ax.set_xlim(df_temp[col_bloco].min() - 0.6, df_temp[col_bloco].max() + 2.6)
+    ax.set_xlabel(f'{rotulo_bloco} (desde o início da base)')
+    ax.set_ylabel('GINI (2·AUC − 1)')
+    cv = d.groupby('Janela')['GINI'].agg(lambda s: s.std() / s.mean() * 100)
+    _titulo_ax(ax, 'Estabilidade Temporal do GINI',
+               ' | '.join(f'Coeficiente de variação {j}: {v:.1f}%' for j, v in cv.items()))
+    plt.tight_layout()
+    _salvar_fig(fig, filepath)
+    return medias
+
+
+# ------------------------------------------------------------------------------
+# 6. MODELO x CLUSTERS (ARQUÉTIPOS DE FRAUDE DO 03_Segmentacao)
+# ------------------------------------------------------------------------------
+def obter_rotulos_clusters_fraude(
+    df_master: pd.DataFrame, meta: Optional[Dict[str, Any]], mapa_arquetipos: Dict[int, str],
+    caminho_cache: Optional[Union[str, Path]] = None, k: int = 10, n_neighbors: int = 40, min_dist: float = 0.0,
+    random_state: int = 42, forcar_recalculo: bool = False,
+) -> pd.DataFrame:
+    """
+    Rótulos de cluster (K-Means K=10 no UMAP 10D) e arquétipo para 100% das fraudes do `df_master`,
+    reproduzindo EXATAMENTE a esteira do 03_Segmentacao (mesmo recorte, ordenação, pré-processamento,
+    UMAP e semente). O resultado é salvo em cache (`caminho_cache`) para não recalcular o UMAP.
+    """
+    if caminho_cache is not None and Path(caminho_cache).exists() and not forcar_recalculo:
+        df_cl = pd.read_parquet(caminho_cache)
+        print(f"[CLUSTERS] Rótulos carregados do cache: {caminho_cache} ({len(df_cl):,} fraudes)")
+        return df_cl
+
+    from sklearn.cluster import KMeans
+    print("[CLUSTERS] Cache não encontrado — reproduzindo a esteira do 03_Segmentacao (UMAP 10D + K-Means)...")
+    df_fraude = df_master[df_master['isFraud'] == 1].sort_values('TransactionDT').reset_index(drop=True)
+    X_tratado, _, _, _ = preparar_dados_clusterizacao(
+        df_fraude, meta=meta, max_ohe_cardinalidade=15, aplicar_log1p_assimetricas=True,
+        limiar_skew_log=1.0, corrigir_drift_d=True)
+    X_umap_10d, _ = projetar_umap(X_tratado, n_components=10, n_neighbors=n_neighbors, min_dist=min_dist,
+                                  random_state=random_state)
+    rotulos = KMeans(n_clusters=k, init='k-means++', n_init=20, random_state=random_state).fit_predict(X_umap_10d)
+    df_cl = pd.DataFrame({'TransactionID': df_fraude['TransactionID'].values, 'cluster': rotulos.astype(int)})
+    df_cl['arquetipo'] = df_cl['cluster'].map(mapa_arquetipos)
+    if caminho_cache is not None:
+        Path(caminho_cache).parent.mkdir(parents=True, exist_ok=True)
+        df_cl.to_parquet(caminho_cache, index=False)
+        print(f"[CLUSTERS] Rótulos salvos em cache: {caminho_cache}")
+    return df_cl
+
+
+def avaliar_modelo_por_grupo(df_fraudes: pd.DataFrame, col_grupo: str, col_janela: str = 'Janela',
+                             ordem: Optional[List[Any]] = None) -> pd.DataFrame:
+    """
+    Desempenho do modelo DENTRO das fraudes de cada grupo (cluster/arquétipo) e janela:
+    Recall, prejuízo total, evitado (VP) e vazado (FN) em US$, e score mediano.
+    (Os clusters existem só para fraudes, então a métrica natural é a captura — Recall.)
+    """
+    linhas = []
+    for (g, j), d in df_fraudes.groupby([col_grupo, col_janela], sort=False):
+        barrada = d['bloquear'].values
+        amt = d['amt_usd'].values
+        linhas.append({
+            'Grupo': g, 'Janela': j, 'Fraudes': len(d),
+            'Recall_%': barrada.mean() * 100,
+            'Prejuizo_Total_USD': amt.sum(),
+            'Prejuizo_Evitado_USD': amt[barrada].sum(),
+            'Prejuizo_Vazado_USD': amt[~barrada].sum(),
+            '%_Vazado_USD': amt[~barrada].sum() / max(1e-9, amt.sum()) * 100,
+            'Ticket_Medio_USD': amt.mean(),
+            'Score_Mediano': float(np.median(d['prob_raw'])),
+        })
+    df = pd.DataFrame(linhas)
+    tot_vaz = df.groupby('Janela')['Prejuizo_Vazado_USD'].transform('sum')
+    df['%_do_Vazamento_da_Janela'] = df['Prejuizo_Vazado_USD'] / tot_vaz.replace(0, np.nan) * 100
+    if ordem is not None:
+        df['Grupo'] = pd.Categorical(df['Grupo'], categories=ordem, ordered=True)
+    return df.sort_values(['Grupo', 'Janela']).reset_index(drop=True)
+
+
+def plot_recall_grupos_janelas(df_grupo: pd.DataFrame, ordem: Optional[List[Any]] = None,
+                               figsize: Tuple[float, float] = (16, 5.8), filepath: Optional[Union[str, Path]] = None) -> None:
+    """
+    (1) Recall por grupo In-Time x OOT; (2) prejuízo vazado (FN, US$) no OOT por grupo,
+    com o pior grupo destacado no acento laranja.
+    """
+    ordem = ordem or list(dict.fromkeys(df_grupo['Grupo']))
+    piv_r = df_grupo.pivot_table(index='Grupo', columns='Janela', values='Recall_%', observed=False).reindex(ordem)
+    piv_v = df_grupo.pivot_table(index='Grupo', columns='Janela', values='Prejuizo_Vazado_USD', observed=False).reindex(ordem)
+    piv_p = df_grupo.pivot_table(index='Grupo', columns='Janela', values='%_Vazado_USD', observed=False).reindex(ordem)
+    x = np.arange(len(ordem))
+    w = 0.38
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
+    ax1.bar(x - w / 2, piv_r.get('In-Time', pd.Series(np.nan, index=ordem)), width=w, color=COR_IN_TIME, label='In-Time')
+    b = ax1.bar(x + w / 2, piv_r.get('OOT', pd.Series(np.nan, index=ordem)), width=w, color=COR_OOT, label='OOT')
+    ax1.bar_label(b, fmt='%.1f%%', padding=3, fontsize=9, fontweight='bold', color=COR_OOT)
+    ax1.set(xticks=x, ylim=(0, 105), ylabel='Recall (% das fraudes barradas)')
+    ax1.set_xticklabels([str(o) for o in ordem], rotation=0 if len(ordem) <= 5 else 30, ha='center' if len(ordem) <= 5 else 'right')
+    ax1.grid(axis='x', visible=False)
+    ax1.legend(loc='upper right', ncol=2)
+    _titulo_ax(ax1, 'Captura de Fraude (Recall) por Grupo', 'Queda do OOT vs. In-Time revela onde o modelo perde força')
+
+    vaz = piv_v.get('OOT', pd.Series(0.0, index=ordem)).fillna(0) / 1e3
+    i_pior = int(np.argmax(vaz.values))
+    cores = [PALETA_AZUL['acento'] if i == i_pior else PALETA_AZUL['principal'] for i in range(len(ordem))]
+    b2 = ax2.bar(x, vaz.values, color=cores, width=0.6)
+    pct = piv_p.get('OOT', pd.Series(np.nan, index=ordem)).values
+    for bar, v, p_ in zip(b2, vaz.values, pct):
+        ax2.text(bar.get_x() + bar.get_width() / 2, v, f'US$ {v:,.1f}k\n({p_:.0f}% do grupo)', ha='center',
+                 va='bottom', fontsize=8.8, fontweight='bold', color=PALETA_AZUL['texto'])
+    ax2.set(xticks=x, ylim=(0, max(1e-6, vaz.max()) * 1.3), ylabel='Prejuízo vazado — FN (US$ mil)')
+    ax2.set_xticklabels([str(o) for o in ordem], rotation=0 if len(ordem) <= 5 else 30, ha='center' if len(ordem) <= 5 else 'right')
+    ax2.grid(axis='x', visible=False)
+    _titulo_ax(ax2, 'Prejuízo que Escapou do Modelo no OOT', f'Maior vazamento: {ordem[i_pior]} (em laranja)')
+    plt.tight_layout()
+    _salvar_fig(fig, filepath)
+
+
+def plot_score_fraudes_por_grupo(df_fraudes: pd.DataFrame, col_grupo: str, ordem: Optional[List[Any]] = None,
+                                 faixa_corte: Optional[Tuple[float, float]] = None, col_score: str = 'prob_raw',
+                                 figsize: Tuple[float, float] = (14, 5.5), filepath: Optional[Union[str, Path]] = None) -> None:
+    """Boxplot do score das FRAUDES por grupo e janela: fraudes à esquerda da faixa de corte são as que passam."""
+    ordem = ordem or list(dict.fromkeys(df_fraudes[col_grupo]))
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.boxplot(data=df_fraudes, y=col_grupo, x=col_score, hue='Janela', order=ordem, hue_order=['In-Time', 'OOT'],
+                palette={'In-Time': COR_IN_TIME, 'OOT': COR_OOT}, showfliers=False, width=0.62, linewidth=1.2, ax=ax,
+                medianprops={'color': 'white', 'lw': 2})
+    if faixa_corte is not None:
+        ax.axvspan(*faixa_corte, color=PALETA_AZUL['acento'], alpha=0.14, lw=0, zorder=0)
+        ax.text(np.mean(faixa_corte), 0.01, 'faixa de corte', transform=ax.get_xaxis_transform(), ha='center',
+                va='bottom', fontsize=9, color=PALETA_AZUL['acento'], fontweight='bold')
+    ax.set(xlim=(0, 1), xlabel='Score do modelo nas fraudes (probabilidade bruta)', ylabel='')
+    ax.grid(axis='y', visible=False)
+    ax.legend(title='', loc='lower right', ncol=2)
+    _titulo_ax(ax, 'Score Atribuído às Fraudes por Grupo',
+               'Quanto mais à esquerda da faixa de corte, mais "invisível" o grupo é para o modelo')
+    plt.tight_layout()
+    _salvar_fig(fig, filepath)
+
+
+def plot_matriz_prioridade_clusters(df_cluster_oot: pd.DataFrame, rotulo_col: str = 'Grupo', cor_col: Optional[str] = None,
+                                    paleta: Optional[Dict[str, str]] = None, figsize: Tuple[float, float] = (13, 6.5),
+                                    filepath: Optional[Union[str, Path]] = None) -> None:
+    """
+    Matriz de prioridade dos clusters no OOT: X = Recall, Y = prejuízo vazado (US$), tamanho = nº de fraudes.
+    Quadrante superior esquerdo (recall baixo + vazamento alto) = prioridade de ação.
+    """
+    d = df_cluster_oot.copy()
+    fig, ax = plt.subplots(figsize=figsize)
+    rec_med = np.average(d['Recall_%'], weights=d['Fraudes'])
+    vaz_med = d['Prejuizo_Vazado_USD'].median() / 1e3
+    ax.axvline(rec_med, color=PALETA_AZUL['cinza'], ls='--', lw=1)
+    ax.axhline(vaz_med, color=PALETA_AZUL['cinza'], ls='--', lw=1)
+    cores = d[cor_col].map(paleta).fillna(PALETA_AZUL['medio']) if (cor_col and paleta) else PALETA_AZUL['medio']
+    ax.scatter(d['Recall_%'], d['Prejuizo_Vazado_USD'] / 1e3, s=60 + 1400 * d['Fraudes'] / d['Fraudes'].max(),
+               c=cores, alpha=0.85, edgecolor='white', lw=1.5, zorder=3)
+    for _, r in d.iterrows():
+        ax.annotate(str(r[rotulo_col]), (r['Recall_%'], r['Prejuizo_Vazado_USD'] / 1e3), ha='center', va='center',
+                    fontsize=9, fontweight='bold', color='white', zorder=4)
+    ax.text(0.01, 0.98, 'PRIORIDADE\nrecall baixo · vazamento alto', transform=ax.transAxes, va='top', fontsize=9.5,
+            fontweight='bold', color=PALETA_AZUL['acento'])
+    if cor_col and paleta:
+        from matplotlib.lines import Line2D
+        handles = [Line2D([0], [0], marker='o', ls='', color=c, ms=9, label=g) for g, c in paleta.items() if g in set(d[cor_col])]
+        ax.legend(handles=handles, loc='upper right', fontsize=9)
+    ax.set(xlabel='Recall no OOT (% das fraudes do cluster barradas)', ylabel='Prejuízo vazado no OOT (US$ mil)')
+    _titulo_ax(ax, 'Matriz de Prioridade dos Clusters de Fraude (OOT)',
+               f'Tamanho = nº de fraudes · linhas = recall médio ({rec_med:.1f}%) e vazamento mediano (US$ {vaz_med:,.1f}k)')
+    plt.tight_layout()
+    _salvar_fig(fig, filepath)
+
+
+def perfil_fn_vs_vp(df_fraudes: pd.DataFrame, X: pd.DataFrame, features: List[str], top_n: int = 12,
+                    titulo: str = 'Raio-X das Fraudes que Passaram (FN) vs. Barradas (VP)',
+                    figsize: Tuple[float, float] = (12, 6.5), filepath: Optional[Union[str, Path]] = None) -> pd.DataFrame:
+    """
+    Compara o perfil das fraudes aprovadas (FN) com o das barradas (VP) via diferença padronizada
+    (Cohen's d = (média FN − média VP) / desvio combinado), robusta a sinais e escalas diferentes.
+    """
+    Xf = X.loc[df_fraudes.index, features].astype('float64')
+    fn = ~df_fraudes['bloquear'].values
+    a, b = Xf[fn], Xf[~fn]
+    sd = np.sqrt((a.var() + b.var()) / 2).replace(0, np.nan)
+    df = pd.DataFrame({'Média FN (passaram)': a.mean(), 'Média VP (barradas)': b.mean(),
+                       'Diferença padronizada (d)': (a.mean() - b.mean()) / sd}).dropna()
+    df = df.reindex(df['Diferença padronizada (d)'].abs().sort_values(ascending=False).index).head(top_n)
+    plot = df.iloc[::-1]
+    cores = [PALETA_AZUL['marinho'] if v > 0 else PALETA_AZUL['claro'] for v in plot['Diferença padronizada (d)']]
+    fig, ax = plt.subplots(figsize=figsize)
+    bars = ax.barh(plot.index, plot['Diferença padronizada (d)'], color=cores, height=0.65)
+    ax.bar_label(bars, fmt='%+.2f', padding=4, fontsize=9, fontweight='bold', color=PALETA_AZUL['texto'])
+    ax.axvline(0, color=PALETA_AZUL['texto_sec'], lw=1)
+    lim = plot['Diferença padronizada (d)'].abs().max() * 1.25
+    ax.set_xlim(-lim, lim)
+    ax.set_xlabel("Diferença padronizada (Cohen's d) · > 0: maior nas fraudes que PASSARAM")
+    ax.grid(axis='y', visible=False)
+    _titulo_ax(ax, titulo, f'{fn.sum():,} FN vs. {(~fn).sum():,} VP · |d| > 0.5 = diferença relevante')
+    plt.tight_layout()
+    _salvar_fig(fig, filepath)
+    return df
+
+
+# ------------------------------------------------------------------------------
+# 7. INFERÊNCIA E ANÁLISE DO TEST (05_Solucao)
+# ------------------------------------------------------------------------------
+def aplicar_fe_ieee_cis_base(df_tr: pd.DataFrame, df_id: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, np.ndarray]]:
+    """
+    Replica exatamente a engenharia de atributos determinística do 01_EDA.ipynb
+    em tabelas brutas IEEE-CIS (ex.: test_transaction + test_identity).
+
+    Normaliza nomes `id-XX` -> `id_XX` presentes em `test_identity.csv` e preserva
+    os campos reais de negócio (`TransactionID`, `TransactionDT`, `amt_usd`, `ProductCD`)
+    antes de qualquer downcast ou transformação `log1p`.
+    """
+    tr = df_tr.copy()
+    id_df = df_id.rename(columns=lambda c: c.replace('id-', 'id_') if c.startswith('id-') else c).copy()
+
+    contexto = {
+        'TransactionID': tr['TransactionID'].values,
+        'TransactionDT': tr['TransactionDT'].values.astype(float),
+        'amt_usd': tr['TransactionAmt'].values.astype('float64'),
+        'ProductCD': tr['ProductCD'].fillna('Missing').astype(str).values if 'ProductCD' in tr.columns else np.full(len(tr), 'Missing'),
+    }
+
+    # Cell 33 (01_EDA): temporais e centavos
+    tr['tempo_hora'] = ((tr['TransactionDT'] // 3600) % 24).astype('int8')
+    tr['tempo_dia_semana'] = ((tr['TransactionDT'] // (3600 * 24)) % 7).astype('int8')
+    tr['tempo_dia_corrido'] = (tr['TransactionDT'] // (3600 * 24)).astype('int16')
+    tr['valor_centavos'] = np.modf(tr['TransactionAmt'])[0].astype('float32')
+
+    # Cell 35 (01_EDA): e-mail, nulos em transaction e flags de presença
+    tr['email_mesmo_dominio'] = ((tr['P_emaildomain'] == tr['R_emaildomain']) & tr['P_emaildomain'].notnull()).astype('int8')
+    tr['email_sufixo_P'] = tr['P_emaildomain'].str.split('.').str[-1]
+    cols_tr_features = [c for c in tr.columns if c not in ['TransactionID', 'isFraud']]
+    tr['cont_null_tr'] = tr[cols_tr_features].isnull().sum(axis=1).astype('int16')
+    tr['flag_tem_dist2'] = tr['dist2'].notnull().astype('int8')
+    tr['flag_tem_R_email'] = tr['R_emaildomain'].notnull().astype('int8')
+
+    # Cell 37 (01_EDA): bloco M, cartão e anomalias V
+    cols_m_bool = [c for c in ['M1', 'M2', 'M3', 'M5', 'M6', 'M7', 'M8', 'M9'] if c in tr.columns]
+    tr['match_cont_T'] = (tr[cols_m_bool] == 'T').sum(axis=1).astype('int8')
+    tr['match_cont_F'] = (tr[cols_m_bool] == 'F').sum(axis=1).astype('int8')
+    tr['match_assinatura_M1M2M3'] = tr['M1'].fillna('X') + '_' + tr['M2'].fillna('X') + '_' + tr['M3'].fillna('X')
+    tr['match_M4_cat'] = tr['M4'].fillna('Missing').astype('category')
+
+    tr['cartao_tipo_cat'] = tr['card6'].replace({'debit or credit': 'debit', 'charge card': 'credit'}).fillna('missing')
+    tr['cartao_bandeira_tipo'] = (tr['card4'].fillna('missing') + '_' + tr['cartao_tipo_cat']).astype('category')
+
+    if 'V14' in tr.columns:
+        tr['flag_V14_zero'] = (tr['V14'] == 0.0).astype('int8')
+    cols_near_const = [c for c in ['V107', 'V117', 'V118', 'V119', 'V120', 'V121', 'V122'] if c in tr.columns]
+    if cols_near_const:
+        tr['flag_V_anomalia_quase_const'] = ((tr[cols_near_const] != 1.0) & tr[cols_near_const].notnull()).any(axis=1).astype('int8')
+    if 'V305' in tr.columns:
+        tr.drop(columns=['V305'], inplace=True)
+    for col in cols_m_bool:
+        tr[f'match_{col}_bin'] = tr[col].map({'T': 1, 'F': 0})
+
+    # Cell 39 (01_EDA): renomeação C* -> vel_C* e D* -> delta_D*
+    mapa_ren = {f'C{i}': f'vel_C{i}' for i in range(1, 15)}
+    mapa_ren.update({f'D{i}': f'delta_D{i}' for i in range(1, 16)})
+    tr.rename(columns={k: v for k, v in mapa_ren.items() if k in tr.columns}, inplace=True)
+
+    # Cell 50 (01_EDA): nulos em identity + descarte esparso
+    id_df['cont_null_id'] = id_df.isnull().sum(axis=1)
+    if 'id_23' in id_df.columns:
+        id_df['flag_checagem_rede_avancada'] = id_df['id_23'].notnull().astype('int8')
+    id_df.drop(columns=['id_07', 'id_08', 'id_21', 'id_22', 'id_23', 'id_24', 'id_25', 'id_26', 'id_27'],
+               inplace=True, errors='ignore')
+
+    # Cell 56 (01_EDA): features de segurança, histórico e dispositivo
+    if 'id_34' in id_df.columns:
+        id_df['seg_id34_score'] = id_df['id_34'].str.split(':').str[1].astype(float)
+    flags_seg = [c for c in ['id_35', 'id_36', 'id_37', 'id_38'] if c in id_df.columns]
+    if len(flags_seg) == 4:
+        id_df['seg_assinatura_id35_38'] = (
+            id_df['id_35'].astype(str) + '_' + id_df['id_36'].astype(str) + '_' +
+            id_df['id_37'].astype(str) + '_' + id_df['id_38'].astype(str)
+        )
+        id_df['seg_cont_T_id35_38'] = (id_df[flags_seg] == 'T').sum(axis=1)
+    id_df['hist_disp_ip_consistencia'] = id_df['id_28'].fillna('Miss') + '_' + id_df['id_29'].fillna('Miss')
+    id_df['disp_tela_padrao'] = id_df['id_32'].map(
+        lambda x: 1 if x in [24.0, 32.0] else (0 if pd.notnull(x) else -1)
+    ).astype('int8')
+
+    mapa_ordinal = {
+        'id_12': ('hist_id12_bin', {'NotFound': 0, 'Found': 1}),
+        'id_15': ('hist_id15_ord', {'Unknown': 0, 'New': 1, 'Found': 2}),
+        'id_16': ('hist_id16_bin', {'NotFound': 0, 'Found': 1}),
+        'id_28': ('hist_id28_bin', {'New': 0, 'Found': 1}),
+        'id_29': ('hist_id29_bin', {'NotFound': 0, 'Found': 1}),
+        'id_35': ('seg_id35_bin', {'F': 0, 'T': 1}),
+        'id_36': ('seg_id36_bin', {'F': 0, 'T': 1}),
+        'id_37': ('seg_id37_bin', {'F': 0, 'T': 1}),
+        'id_38': ('seg_id38_bin', {'F': 0, 'T': 1}),
+        'DeviceType': ('disp_tipo_bin', {'desktop': 0, 'mobile': 1}),
+    }
+    for col, (novo_nome, mapping) in mapa_ordinal.items():
+        if col in id_df.columns:
+            id_df[novo_nome] = id_df[col].map(mapping)
+
+    if 'id_31' in id_df.columns:
+        id_df['disp_navegador'] = id_df['id_31'].str.split(' ').str[0].str.lower().replace({
+            'samsung': 'samsung', 'mobile': 'safari', 'google': 'chrome'
+        })
+    if 'id_33' in id_df.columns:
+        id_df['disp_tela_largura'] = id_df['id_33'].str.split('x').str[0].astype(float)
+        id_df['disp_tela_altura'] = id_df['id_33'].str.split('x').str[1].astype(float)
+        id_df['disp_tela_area'] = id_df['disp_tela_largura'] * id_df['disp_tela_altura']
+    if 'DeviceInfo' in id_df.columns:
+        id_df['disp_marca'] = 'Other'
+        for padrao, marca in [
+            ('SM-|SAMSUNG', 'Samsung'), ('iOS|Mac|Apple', 'Apple'), ('Windows', 'Windows'),
+            ('Moto|XT', 'Motorola'), ('LG-', 'LG'), ('Huawei|ALE-|HUAWEI', 'Huawei'),
+        ]:
+            id_df.loc[id_df['DeviceInfo'].str.contains(padrao, na=False, case=False), 'disp_marca'] = marca
+
+    # Cell 61 (01_EDA): descarte textual, downcast e merge left
+    id_df.drop(columns=['id_31', 'id_33', 'DeviceInfo'], inplace=True, errors='ignore')
+    tr = safe_downcast(tr)
+    id_df = safe_downcast(id_df)
+    df_merged = tr.merge(id_df, on='TransactionID', how='left')
+
+    # Cell 66 (01_EDA): razão card1 e frequency encoding intra-base
+    card1_mean_amt = df_merged.groupby('card1')['TransactionAmt'].transform('mean')
+    df_merged['valor_razao_media_card1'] = (df_merged['TransactionAmt'] / (card1_mean_amt + 1e-5)).astype('float32')
+    for col in ['card1', 'card2', 'addr1', 'P_emaildomain']:
+        if col in df_merged.columns:
+            df_merged[f'freq_{col}'] = df_merged[col].map(df_merged[col].value_counts(dropna=False)).astype('float32')
+
+    return df_merged, contexto
+
+
+def _detectar_e_aplicar_log1p_referencia(
+    df_alvo: pd.DataFrame, df_ref: pd.DataFrame, random_state: int = 42
+) -> Tuple[pd.DataFrame, List[str]]:
+    """
+    Aplica `np.log1p` nas colunas de `df_alvo` cuja contraparte em `df_ref` (df_master)
+    foi transformada por `analisar_e_transformar_caudas_longas` no 01_EDA.
+    Decide pela menor distância KS (escala bruta vs. `log1p`) contra `df_ref`.
+    """
+    df_out = df_alvo.copy()
+    cols_ignorar = {'TransactionID', 'isFraud', 'TransactionDT'}
+    cols_log: List[str] = []
+
+    for col in df_out.select_dtypes(include=[np.number]).columns:
+        if col in cols_ignorar or col.endswith('_num') or col.startswith(('has_', 'is_')) or col not in df_ref.columns:
+            continue
+        m = df_ref[col].dropna()
+        t = df_out[col].dropna()
+        if len(m) == 0 or len(t) == 0 or m.nunique() <= 10 or m.min() < 0:
+            continue
+        m_s = m.sample(min(len(m), 40_000), random_state=random_state).astype('float64')
+        t_s = t.sample(min(len(t), 40_000), random_state=random_state).astype('float64')
+        ks_raw = ks_2samp(m_s, t_s).statistic
+        ks_log = ks_2samp(m_s, np.log1p(t_s.clip(lower=0))).statistic
+        if ks_log < ks_raw:
+            df_out[col] = np.log1p(df_out[col].astype('float64').clip(lower=0)).astype('float32')
+            cols_log.append(col)
+
+    return df_out, cols_log
+
+
+def preparar_dados_teste_inferencia(
+    df_test_tr: pd.DataFrame,
+    df_test_id: pd.DataFrame,
+    df_master: pd.DataFrame,
+    features_modelo: List[str],
+    meta: Optional[dict] = None,
+    train_ratio: float = 0.60,
+    test_ratio: float = 0.20,
+) -> Dict[str, Any]:
+    """
+    Prepara o conjunto cego de teste (Kaggle) com paridade total em relação ao
+    `01_EDA.ipynb` + `preparar_dados_modelagem`:
+      1. Engenharia de atributos determinística (`aplicar_fe_ieee_cis_base`)
+      2. Alinhamento `log1p` idêntico ao `df_master` (`_detectar_e_aplicar_log1p_referencia`)
+      3. Estatísticas `card1`/`*_freq` e `OrdinalEncoder` ajustados SOMENTE nos 60% de treino
+         de `df_master`, reutilizando `preparar_dados_modelagem` para as partições de referência.
+    """
+    from sklearn.preprocessing import OrdinalEncoder
+
+    df_fe, contexto = aplicar_fe_ieee_cis_base(df_test_tr, df_test_id)
+    df_fe, cols_log = _detectar_e_aplicar_log1p_referencia(df_fe, df_master)
+
+    dados_prep = preparar_dados_modelagem(df_master=df_master, meta=meta, train_ratio=train_ratio, test_ratio=test_ratio)
+    train_ref = df_master.sort_values('TransactionDT').iloc[:int(len(df_master) * train_ratio)]
+    cat_cols = dados_prep['cat_cols']
+
+    # Mesmo ajuste pós-split de `preparar_dados_modelagem` (âncoras D*, razão card1, freqs e OrdinalEncoder)
+    for col in [c for c in df_fe.columns if c.startswith('D') and c[1:].isdigit()]:
+        df_fe[f'{col}_ancora'] = df_fe[col] - (df_fe['TransactionDT'] / 86400.0)
+
+    card1_stats = train_ref.groupby('card1')['TransactionAmt'].mean()
+    media_global = float(train_ref['TransactionAmt'].mean())
+    df_fe['TransactionAmt_to_mean_card1'] = (
+        df_fe['TransactionAmt'] / (df_fe['card1'].map(card1_stats).fillna(media_global) + 1e-5)
+    )
+    for col in ['card1', 'card2', 'addr1', 'P_emaildomain']:
+        if col in df_fe.columns and col in train_ref.columns:
+            freq_map = train_ref[col].value_counts(dropna=False)
+            df_fe[f'{col}_freq'] = df_fe[col].map(freq_map).fillna(0)
+
+    cats_ok = [c for c in cat_cols if c in df_fe.columns and c in train_ref.columns]
+    if cats_ok:
+        ord_enc = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1)
+        ord_enc.fit(train_ref[cats_ok].astype(object).fillna('Missing').astype(str))
+        df_fe[cats_ok] = ord_enc.transform(df_fe[cats_ok].astype(object).fillna('Missing').astype(str))
+
+    ausentes = [f for f in features_modelo if f not in df_fe.columns]
+    if ausentes:
+        raise ValueError(f"Features esperadas pelo modelo ausentes no Test após FE: {ausentes}")
+
+    X_test_final = df_fe[features_modelo]
+    X_in_time = pd.concat([dados_prep['X_train'][features_modelo], dados_prep['X_test'][features_modelo]])
+
+    print(f"[Teste] Matriz pronta: {X_test_final.shape[0]:,} linhas × {X_test_final.shape[1]} features | "
+          f"{len(cols_log)} colunas em escala log1p.")
+
+    return {
+        'X_test': X_test_final,
+        'X_in_time': X_in_time,
+        'X_val': dados_prep['X_test'][features_modelo],
+        'X_oot': dados_prep['X_oot'][features_modelo],
+        'val_df': dados_prep['test_df'],
+        'oot_df': dados_prep['oot_df'],
+        'cols_log1p': cols_log,
+        **contexto,
+    }
+
+
+def resumir_predicoes_test(df_pred: pd.DataFrame, col_grupo: str) -> pd.DataFrame:
+    """Agrega volumetria, taxa prevista, score calibrado médio e exposição em US$ por segmento."""
+    df_tmp = df_pred.copy()
+    if 'amt_bloqueado_usd' not in df_tmp.columns:
+        df_tmp['amt_bloqueado_usd'] = np.where(df_tmp['pred_fraude'] == 1, df_tmp['amt_usd'], 0.0)
+    g = (
+        df_tmp.groupby(col_grupo, observed=False)
+        .agg(
+            Transacoes=('TransactionID', 'count'),
+            Prev_Fraudes=('pred_fraude', 'sum'),
+            Prob_Cal_Media=('prob_cal', 'mean'),
+            Threshold_Medio=('threshold_dinamico', 'mean'),
+            Ticket_Medio_USD=('amt_usd', 'mean'),
+            Valor_Total_USD=('amt_usd', 'sum'),
+            Valor_Bloqueado_USD=('amt_bloqueado_usd', 'sum'),
+        )
+        .reset_index()
+    )
+    g['%_Base'] = g['Transacoes'] / len(df_tmp) * 100
+    g['Taxa_Prevista_%'] = g['Prev_Fraudes'] / g['Transacoes'] * 100
+    g['Prob_Cal_Media_%'] = g['Prob_Cal_Media'] * 100
+    g['Threshold_Medio_%'] = g['Threshold_Medio'] * 100
+    total_bloq = max(float(df_tmp['amt_bloqueado_usd'].sum()), 1e-9)
+    g['%_Exposicao_Bloq'] = g['Valor_Bloqueado_USD'] / total_bloq * 100
+    return g
+
+
+def plot_evolucao_predicoes_test(
+    df_temp: pd.DataFrame, col_bloco: str = 'mes_test', rotulo_bloco: str = 'Mês do Test',
+    figsize: Tuple[float, float] = (14, 5.2), filepath: Optional[Union[str, Path]] = None
+) -> None:
+    """
+    Evolução temporal das predições no Test (sem ground-truth):
+    volume em barras ao fundo, taxa de fraude prevista (%) e score calibrado médio (%).
+    """
+    fig, ax = plt.subplots(figsize=figsize)
+    ax_vol = ax.twinx()
+    ax_vol.bar(df_temp[col_bloco], df_temp['Transacoes'], width=0.62, color=PALETA_AZUL['cinza_claro'], alpha=0.55, zorder=0)
+    ax_vol.set_ylim(0, df_temp['Transacoes'].max() * 3.1)
+    ax_vol.set_yticks([])
+    ax_vol.grid(False)
+    for s in ax_vol.spines.values():
+        s.set_visible(False)
+    ax.set_zorder(ax_vol.get_zorder() + 1)
+    ax.patch.set_visible(False)
+
+    ax.plot(df_temp[col_bloco], df_temp['Taxa_Prevista_%'], color=COR_OOT, lw=2.6, marker='o', ms=6.5,
+            markerfacecolor='white', markeredgewidth=2, label='Taxa prevista (pred_fraude = 1)', zorder=3)
+    ax.plot(df_temp[col_bloco], df_temp['Prob_Cal_Media_%'], color=PALETA_AZUL['acento'], lw=2.0, ls='--',
+            marker='s', ms=5, label='Score calibrado médio (prob_cal)', zorder=3)
+
+    for _, r in df_temp.iterrows():
+        ax.annotate(f"{r['Taxa_Prevista_%']:.2f}%", (r[col_bloco], r['Taxa_Prevista_%']),
+                    xytext=(0, 8), textcoords='offset points', ha='center', fontsize=8.5,
+                    fontweight='bold', color=COR_OOT)
+
+    ymax = max(df_temp['Taxa_Prevista_%'].max(), df_temp['Prob_Cal_Media_%'].max()) * 1.32
+    ax.set(xlabel=f'{rotulo_bloco} · barras cinza = volume de transações', ylabel='Taxa / Score (%)', ylim=(0, ymax))
+    ax.legend(loc='upper right', frameon=True, facecolor='white', edgecolor='white', framealpha=0.9)
+    _titulo_ax(ax, f'Comportamento Temporal das Predições no Test ({rotulo_bloco})',
+               f"Taxa prevista global: {df_temp['Prev_Fraudes'].sum() / df_temp['Transacoes'].sum() * 100:.2f}% "
+               f"| Score calibrado médio: {(df_temp['Prob_Cal_Media_%'] * df_temp['Transacoes']).sum() / df_temp['Transacoes'].sum():.2f}%")
+    plt.tight_layout()
+    _salvar_fig(fig, filepath)
+
+
+def plot_predicoes_por_categoria(
+    df_resumo: pd.DataFrame, col_cat: str, titulo: str, subtitulo: Optional[str] = None,
+    figsize: Tuple[float, float] = (14, 4.8), filepath: Optional[Union[str, Path]] = None
+) -> None:
+    """Painel enxuto (2 gráficos) de taxa prevista (%) e volume financeiro bloqueado (US$ mi) por segmento."""
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
+    x = np.arange(len(df_resumo))
+    rotulos = df_resumo[col_cat].astype(str)
+
+    bars1 = ax1.bar(x, df_resumo['Taxa_Prevista_%'], color=COR_OOT, width=0.58)
+    ax1.bar_label(bars1, fmt='%.2f%%', padding=4, fontsize=9, fontweight='bold', color=PALETA_AZUL['texto'])
+    ax1.set(xticks=x, xticklabels=rotulos, ylabel='Taxa prevista (%)',
+            ylim=(0, df_resumo['Taxa_Prevista_%'].max() * 1.25))
+    ax1.grid(axis='x', visible=False)
+    _titulo_ax(ax1, 'Taxa de Fraude Prevista (%)', 'Concentração de risco por segmento')
+
+    vol_mi = df_resumo['Valor_Bloqueado_USD'] / 1e6
+    bars2 = ax2.bar(x, vol_mi, color=PALETA_AZUL['principal'], width=0.58)
+    ax2.bar_label(bars2, fmt='$%.2fM', padding=4, fontsize=9, fontweight='bold', color=PALETA_AZUL['texto'])
+    ax2.set(xticks=x, xticklabels=rotulos, ylabel='Valor bloqueado (US$ milhões)',
+            ylim=(0, max(vol_mi.max(), 0.01) * 1.25))
+    ax2.grid(axis='x', visible=False)
+    _titulo_ax(ax2, 'Exposição Financeira Bloqueada (US$ mi)', 'Soma de amt_usd onde pred_fraude = 1')
+
+    _titulo_fig(fig, titulo, subtitulo)
+    plt.tight_layout()
+    _salvar_fig(fig, filepath)
 
 
 # ==============================================================================
@@ -5833,5 +9702,68 @@ __all__ = [
     'plot_optuna_clusterizacao',
     'consolidar_comparacao_clusterizacao',
     'plot_heatmap_zscore_clusters',
+    'plot_matriz_confusao_final',
+    'PALETA_ARQUETIPOS_PADRAO',
+    'COR_RUIDO_CLUSTER',
+    'reverter_escala_log1p',
+    'gerar_tabela_arquetipos',
+    'plot_volume_vs_prejuizo_arquetipos',
+    'plot_violino_arquetipos',
+    'resumir_dinamica_temporal_arquetipos',
+    'plot_evolucao_temporal_arquetipos',
+    'plot_arquetipos_2d_plotly',
+    'verificar_disponibilidade_hdbscan',
+    'avaliar_viabilidade_hdbscan',
+    'selecionar_config_hdbscan',
+    'ajustar_hdbscan',
+    'comparar_hdbscan_vs_arquetipos',
+    'plot_crosstab_hdbscan_arquetipos',
+    'veredito_viabilidade_hdbscan',
+    # Avaliação OOT (04_Avaliacao)
+    'aplicar_estilo_azul',
+    'gerar_scores_oof_treino',
+    'escorar_particao',
+    'adicionar_bloco_temporal',
+    'tabela_metricas_janelas',
+    'formatar_tabela_metricas',
+    'plot_matrizes_confusao_janelas',
+    'plot_roc_pr_janelas',
+    'plot_kde_scores_janelas',
+    'plot_cdf_ks_janelas',
+    'gerar_tabela_decis_ks',
+    'plot_decis_janelas',
+    'calcular_shap_lgbm',
+    'ranking_shap',
+    'plot_importancia_shap',
+    'plot_shap_beeswarm',
+    'plot_shap_janelas',
+    'tabela_temporal',
+    'plot_target_drift_temporal',
+    'teste_qui_quadrado_temporal',
+    'calcular_psi_scores',
+    'plot_psi_score_faixas',
+    'relatorio_psi_features',
+    'plot_psi_vs_shap',
+    'plot_comparativo_psi_features',
+    'plot_gini_temporal',
+    'obter_rotulos_clusters_fraude',
+    'avaliar_modelo_por_grupo',
+    'plot_recall_grupos_janelas',
+    'plot_score_fraudes_por_grupo',
+    'plot_matriz_prioridade_clusters',
+    'perfil_fn_vs_vp',
+    'PALETA_AZUL',
+    'COR_IN_TIME',
+    'COR_OOT',
+    'COR_LEGITIMA',
+    'COR_FRAUDE',
+    'CMAP_AZUL',
+    # Inferência e análise do Test (05_Solucao)
+    'aplicar_regra_dinamica',
+    'aplicar_fe_ieee_cis_base',
+    'preparar_dados_teste_inferencia',
+    'resumir_predicoes_test',
+    'plot_evolucao_predicoes_test',
+    'plot_predicoes_por_categoria',
 ]
 
