@@ -1,3 +1,4 @@
+import gc
 import os
 import sys
 import math
@@ -9253,7 +9254,7 @@ def plot_score_fraudes_por_grupo(df_fraudes: pd.DataFrame, col_grupo: str, ordem
                 va='bottom', fontsize=9, color=PALETA_AZUL['acento'], fontweight='bold')
     ax.set(xlim=(0, 1), xlabel='Score do modelo nas fraudes (probabilidade bruta)', ylabel='')
     ax.grid(axis='y', visible=False)
-    ax.legend(title='', loc='lower right', ncol=2)
+    ax.legend(title='', loc='lower right', bbox_to_anchor=(1.0, 1.01), ncol=2, frameon=False)
     _titulo_ax(ax, 'Score Atribuído às Fraudes por Grupo',
                'Quanto mais à esquerda da faixa de corte, mais "invisível" o grupo é para o modelo')
     plt.tight_layout()
@@ -9325,14 +9326,19 @@ def perfil_fn_vs_vp(df_fraudes: pd.DataFrame, X: pd.DataFrame, features: List[st
 # ------------------------------------------------------------------------------
 # 7. INFERÊNCIA E ANÁLISE DO TEST (05_Solucao)
 # ------------------------------------------------------------------------------
-def aplicar_fe_ieee_cis_base(df_tr: pd.DataFrame, df_id: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, np.ndarray]]:
+def aplicar_fe_ieee_cis_base(
+    df_tr: pd.DataFrame,
+    df_id: pd.DataFrame,
+    n_ref: Optional[int] = None,
+) -> Tuple[pd.DataFrame, Dict[str, np.ndarray]]:
     """
     Replica exatamente a engenharia de atributos determinística do 01_EDA.ipynb
     em tabelas brutas IEEE-CIS (ex.: test_transaction + test_identity).
 
-    Normaliza nomes `id-XX` -> `id_XX` presentes em `test_identity.csv` e preserva
+    Normaliza nomes `id-XX` -> `id_XX` presentes em `test_identity.csv`, preserva
     os campos reais de negócio (`TransactionID`, `TransactionDT`, `amt_usd`, `ProductCD`)
-    antes de qualquer downcast ou transformação `log1p`.
+    antes de qualquer downcast ou transformação `log1p`, e ajusta a escala de
+    `freq_*` para o tamanho amostral de referência (`n_ref`, quando informado).
     """
     tr = df_tr.copy()
     id_df = df_id.rename(columns=lambda c: c.replace('id-', 'id_') if c.startswith('id-') else c).copy()
@@ -9443,27 +9449,42 @@ def aplicar_fe_ieee_cis_base(df_tr: pd.DataFrame, df_id: pd.DataFrame) -> Tuple[
     id_df = safe_downcast(id_df)
     df_merged = tr.merge(id_df, on='TransactionID', how='left')
 
-    # Cell 66 (01_EDA): razão card1 e frequency encoding intra-base
+    # Cell 66 (01_EDA): razão card1 e frequency encoding (ajustado p/ escala amostral de referência `n_ref`)
     card1_mean_amt = df_merged.groupby('card1')['TransactionAmt'].transform('mean')
     df_merged['valor_razao_media_card1'] = (df_merged['TransactionAmt'] / (card1_mean_amt + 1e-5)).astype('float32')
+    fator_escala = (float(n_ref) / max(len(df_merged), 1)) if n_ref is not None else 1.0
     for col in ['card1', 'card2', 'addr1', 'P_emaildomain']:
         if col in df_merged.columns:
-            df_merged[f'freq_{col}'] = df_merged[col].map(df_merged[col].value_counts(dropna=False)).astype('float32')
+            vc = df_merged[col].value_counts(dropna=False) * fator_escala
+            df_merged[f'freq_{col}'] = df_merged[col].map(vc).astype('float32')
 
     return df_merged, contexto
 
 
 def _detectar_e_aplicar_log1p_referencia(
-    df_alvo: pd.DataFrame, df_ref: pd.DataFrame, random_state: int = 42
+    df_alvo: pd.DataFrame,
+    df_ref: pd.DataFrame,
+    cols_log_explicitas: Optional[List[str]] = None,
+    random_state: int = 42,
 ) -> Tuple[pd.DataFrame, List[str]]:
     """
     Aplica `np.log1p` nas colunas de `df_alvo` cuja contraparte em `df_ref` (df_master)
     foi transformada por `analisar_e_transformar_caudas_longas` no 01_EDA.
-    Decide pela menor distância KS (escala bruta vs. `log1p`) contra `df_ref`.
+
+    Usa a lista explícita de metadados quando fornecida; caso contrário, decide pela menor
+    distância KS após igualar a precisão `float32` e arredondar para 4 casas decimais
+    (evitando falsos degraus de precisão `float32` vs. `float64` em variáveis discretas como `vel_C2`).
     """
     df_out = df_alvo.copy()
     cols_ignorar = {'TransactionID', 'isFraud', 'TransactionDT'}
     cols_log: List[str] = []
+
+    if cols_log_explicitas:
+        for col in cols_log_explicitas:
+            if col in df_out.columns and col not in cols_ignorar:
+                df_out[col] = np.log1p(df_out[col].astype('float64').clip(lower=0)).astype('float32')
+                cols_log.append(col)
+        return df_out, cols_log
 
     for col in df_out.select_dtypes(include=[np.number]).columns:
         if col in cols_ignorar or col.endswith('_num') or col.startswith(('has_', 'is_')) or col not in df_ref.columns:
@@ -9472,10 +9493,12 @@ def _detectar_e_aplicar_log1p_referencia(
         t = df_out[col].dropna()
         if len(m) == 0 or len(t) == 0 or m.nunique() <= 10 or m.min() < 0:
             continue
-        m_s = m.sample(min(len(m), 40_000), random_state=random_state).astype('float64')
-        t_s = t.sample(min(len(t), 40_000), random_state=random_state).astype('float64')
+        m_s = np.round(m.sample(min(len(m), 40_000), random_state=random_state).astype('float32').astype('float64'), 4)
+        t_raw = t.sample(min(len(t), 40_000), random_state=random_state).astype('float64')
+        t_s = np.round(t_raw.astype('float32').astype('float64'), 4)
+        t_log = np.round(np.log1p(t_raw.clip(lower=0)).astype('float32').astype('float64'), 4)
         ks_raw = ks_2samp(m_s, t_s).statistic
-        ks_log = ks_2samp(m_s, np.log1p(t_s.clip(lower=0))).statistic
+        ks_log = ks_2samp(m_s, t_log).statistic
         if ks_log < ks_raw:
             df_out[col] = np.log1p(df_out[col].astype('float64').clip(lower=0)).astype('float32')
             cols_log.append(col)
@@ -9495,46 +9518,85 @@ def preparar_dados_teste_inferencia(
     """
     Prepara o conjunto cego de teste (Kaggle) com paridade total em relação ao
     `01_EDA.ipynb` + `preparar_dados_modelagem`:
-      1. Engenharia de atributos determinística (`aplicar_fe_ieee_cis_base`)
+      1. Engenharia de atributos determinística (`aplicar_fe_ieee_cis_base`) com escala amostral `len(df_master)`
       2. Alinhamento `log1p` idêntico ao `df_master` (`_detectar_e_aplicar_log1p_referencia`)
-      3. Estatísticas `card1`/`*_freq` e `OrdinalEncoder` ajustados SOMENTE nos 60% de treino
-         de `df_master`, reutilizando `preparar_dados_modelagem` para as partições de referência.
+      3. Alinhamento dos mapas `freq_*` com `df_master` (fallback escalado para categorias inéditas)
+      4. Estatísticas `card1`/`*_freq` e `OrdinalEncoder` ajustados SOMENTE nos 60% de treino
+         de `df_master`, registrando a taxa de categorias desconhecidas (`OOV = -1`).
     """
     from sklearn.preprocessing import OrdinalEncoder
 
-    df_fe, contexto = aplicar_fe_ieee_cis_base(df_test_tr, df_test_id)
-    df_fe, cols_log = _detectar_e_aplicar_log1p_referencia(df_fe, df_master)
+    meta = meta or {}
+    cols_log_meta = meta.get('log1p_features') or meta.get('cols_log1p')
+
+    df_fe, contexto = aplicar_fe_ieee_cis_base(df_test_tr, df_test_id, n_ref=len(df_master))
+    df_fe, cols_log = _detectar_e_aplicar_log1p_referencia(df_fe, df_master, cols_log_explicitas=cols_log_meta)
+
+    # Alinha `freq_card1`, `freq_card2`, `freq_addr1`, `freq_P_emaildomain` ao mapa de referência do df_master
+    # (mantendo o valor escalado e já em log1p/raw de `df_fe` como fallback para categorias inéditas no Test)
+    for col in ['card1', 'card2', 'addr1', 'P_emaildomain']:
+        f_col = f'freq_{col}'
+        if col in df_fe.columns and col in df_master.columns and f_col in df_master.columns:
+            mapa_ref = df_master.groupby(col, dropna=False)[f_col].first()
+            mapeado = df_fe[col].map(mapa_ref)
+            df_fe[f_col] = np.where(mapeado.notna(), mapeado, df_fe[f_col]).astype('float32')
 
     dados_prep = preparar_dados_modelagem(df_master=df_master, meta=meta, train_ratio=train_ratio, test_ratio=test_ratio)
     train_ref = df_master.sort_values('TransactionDT').iloc[:int(len(df_master) * train_ratio)]
     cat_cols = dados_prep['cat_cols']
 
-    # Mesmo ajuste pós-split de `preparar_dados_modelagem` (âncoras D*, razão card1, freqs e OrdinalEncoder)
-    for col in [c for c in df_fe.columns if c.startswith('D') and c[1:].isdigit()]:
-        df_fe[f'{col}_ancora'] = df_fe[col] - (df_fe['TransactionDT'] / 86400.0)
-
+    # Mesmo ajuste pós-split de `preparar_dados_modelagem` (razão card1, *_freq e OrdinalEncoder)
     card1_stats = train_ref.groupby('card1')['TransactionAmt'].mean()
     media_global = float(train_ref['TransactionAmt'].mean())
     df_fe['TransactionAmt_to_mean_card1'] = (
         df_fe['TransactionAmt'] / (df_fe['card1'].map(card1_stats).fillna(media_global) + 1e-5)
-    )
+    ).astype('float32')
     for col in ['card1', 'card2', 'addr1', 'P_emaildomain']:
         if col in df_fe.columns and col in train_ref.columns:
             freq_map = train_ref[col].value_counts(dropna=False)
-            df_fe[f'{col}_freq'] = df_fe[col].map(freq_map).fillna(0)
+            df_fe[f'{col}_freq'] = df_fe[col].map(freq_map).fillna(0).astype('float32')
 
+    registros_oov = []
     cats_ok = [c for c in cat_cols if c in df_fe.columns and c in train_ref.columns]
     if cats_ok:
         ord_enc = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1)
         ord_enc.fit(train_ref[cats_ok].astype(object).fillna('Missing').astype(str))
-        df_fe[cats_ok] = ord_enc.transform(df_fe[cats_ok].astype(object).fillna('Missing').astype(str))
+        enc_test = ord_enc.transform(df_fe[cats_ok].astype(object).fillna('Missing').astype(str)).astype('int32')
+        df_fe[cats_ok] = enc_test
+        for idx_c, c in enumerate(cats_ok):
+            n_unk_test = int((enc_test[:, idx_c] == -1).sum())
+            n_unk_val = int((dados_prep['X_test'][c] == -1).sum()) if c in dados_prep['X_test'].columns else 0
+            n_unk_oot = int((dados_prep['X_oot'][c] == -1).sum()) if c in dados_prep['X_oot'].columns else 0
+            registros_oov.append({
+                'Feature': c,
+                'No_Modelo_Final': c in features_modelo,
+                'Categorias_Treino': int(len(ord_enc.categories_[idx_c])),
+                'OOV_Val_%': n_unk_val / max(len(dados_prep['X_test']), 1) * 100,
+                'OOV_OOT_%': n_unk_oot / max(len(dados_prep['X_oot']), 1) * 100,
+                'OOV_Test_Qtd': n_unk_test,
+                'OOV_Test_%': n_unk_test / max(len(df_fe), 1) * 100,
+            })
+
+    df_oov = pd.DataFrame(registros_oov).sort_values(
+        ['No_Modelo_Final', 'OOV_Test_%'], ascending=[False, False]
+    ).reset_index(drop=True) if registros_oov else pd.DataFrame()
 
     ausentes = [f for f in features_modelo if f not in df_fe.columns]
     if ausentes:
         raise ValueError(f"Features esperadas pelo modelo ausentes no Test após FE: {ausentes}")
 
-    X_test_final = df_fe[features_modelo]
-    X_in_time = pd.concat([dados_prep['X_train'][features_modelo], dados_prep['X_test'][features_modelo]])
+    X_test_final = df_fe[features_modelo].replace([np.inf, -np.inf], np.nan).copy()
+    X_in_time = pd.concat(
+        [dados_prep['X_train'][features_modelo], dados_prep['X_test'][features_modelo]],
+        ignore_index=True,
+    )
+    X_val = dados_prep['X_test'][features_modelo].copy()
+    X_oot = dados_prep['X_oot'][features_modelo].copy()
+    val_df = dados_prep['test_df'][['TransactionID', 'TransactionDT', 'TransactionAmt', 'isFraud']].copy()
+    oot_df = dados_prep['oot_df'][['TransactionID', 'TransactionDT', 'TransactionAmt', 'isFraud']].copy()
+
+    del df_fe, dados_prep, train_ref
+    gc.collect()
 
     print(f"[Teste] Matriz pronta: {X_test_final.shape[0]:,} linhas × {X_test_final.shape[1]} features | "
           f"{len(cols_log)} colunas em escala log1p.")
@@ -9542,17 +9604,85 @@ def preparar_dados_teste_inferencia(
     return {
         'X_test': X_test_final,
         'X_in_time': X_in_time,
-        'X_val': dados_prep['X_test'][features_modelo],
-        'X_oot': dados_prep['X_oot'][features_modelo],
-        'val_df': dados_prep['test_df'],
-        'oot_df': dados_prep['oot_df'],
+        'X_val': X_val,
+        'X_oot': X_oot,
+        'val_df': val_df,
+        'oot_df': oot_df,
         'cols_log1p': cols_log,
+        'df_oov': df_oov,
         **contexto,
     }
 
 
+def comparar_escoragem_particoes(
+    df_val_scores: pd.DataFrame,
+    df_oot_scores: pd.DataFrame,
+    df_pred_test: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Tabela comparativa de sanidade dos scores e acionamento operacional entre
+    Validação (In-Time), OOT e Test (sem target).
+    """
+    particoes = [
+        ('Validação (In-Time)', df_val_scores, 'bloquear'),
+        ('Out-of-Time (OOT)', df_oot_scores, 'bloquear'),
+        ('Test (Kaggle · Cego)', df_pred_test, 'pred_fraude'),
+    ]
+    linhas = []
+    for nome, df_p, col_bloq in particoes:
+        col_amt = 'amt_usd' if 'amt_usd' in df_p.columns else 'amt_real'
+        bloq = df_p[col_bloq].astype(bool)
+        amt = df_p[col_amt].astype('float64')
+        prob_cal = df_p['prob_cal'].astype('float64')
+        prob_raw = df_p['prob_raw'].astype('float64')
+        th = df_p['threshold'].astype('float64') if 'threshold' in df_p.columns else df_p['threshold_dinamico'].astype('float64')
+        gmv_total = float(amt.sum())
+        gmv_bloq = float(amt[bloq].sum())
+        linhas.append({
+            'Partição': nome,
+            'Transações': int(len(df_p)),
+            'Score_Bruto_Médio_%': float(prob_raw.mean() * 100),
+            'Prob_Cal_Média_%': float(prob_cal.mean() * 100),
+            'Prob_Cal_P50_%': float(prob_cal.quantile(0.50) * 100),
+            'Prob_Cal_P90_%': float(prob_cal.quantile(0.90) * 100),
+            'Prob_Cal_P99_%': float(prob_cal.quantile(0.99) * 100),
+            'Threshold_Médio_%': float(th.mean() * 100),
+            'Taxa_Bloqueio_%': float(bloq.mean() * 100),
+            'GMV_Retido_%': float(gmv_bloq / max(gmv_total, 1e-9) * 100),
+        })
+    return pd.DataFrame(linhas)
+
+
+def relatorio_psi_vs_importancia_modelo(
+    X_ref: pd.DataFrame,
+    X_atual: pd.DataFrame,
+    artefato: Dict[str, Any],
+    bins: int = 10,
+) -> pd.DataFrame:
+    """
+    Calcula o PSI e KS (In-Time -> Test) das features do modelo e cruza com a importância
+    relativa no estimador final (`feature_importances_`), gerando `Risco_Drift = PSI * %_Importancia`.
+    """
+    features = list(artefato['features'])
+    df_psi = relatorio_psi_features(X_ref, X_atual, features=features, bins=bins)
+    df_psi = df_psi.rename(columns={'%_Nulos_OOT': '%_Nulos_Test'})
+
+    imp = np.asarray(getattr(artefato['modelo'], 'feature_importances_', np.ones(len(features))), dtype='float64')
+    imp_pct = imp / max(imp.sum(), 1e-9) * 100.0
+    df_imp = pd.DataFrame({
+        'Feature': features,
+        'Splits_Modelo': imp.astype(int),
+        '%_Importancia': imp_pct,
+    })
+    df_imp['Rank_Importancia'] = df_imp['Splits_Modelo'].rank(ascending=False, method='min').astype(int)
+
+    df_out = df_psi.merge(df_imp, on='Feature', how='left')
+    df_out['Risco_Drift'] = df_out['PSI'] * (df_out['%_Importancia'] / 100.0)
+    return df_out.sort_values(['PSI', 'Risco_Drift'], ascending=[False, False]).reset_index(drop=True)
+
+
 def resumir_predicoes_test(df_pred: pd.DataFrame, col_grupo: str) -> pd.DataFrame:
-    """Agrega volumetria, taxa prevista, score calibrado médio e exposição em US$ por segmento."""
+    """Agrega volumetria, taxa de acionamento/bloqueio, score calibrado médio e GMV retido por grupo."""
     df_tmp = df_pred.copy()
     if 'amt_bloqueado_usd' not in df_tmp.columns:
         df_tmp['amt_bloqueado_usd'] = np.where(df_tmp['pred_fraude'] == 1, df_tmp['amt_usd'], 0.0)
@@ -9579,12 +9709,18 @@ def resumir_predicoes_test(df_pred: pd.DataFrame, col_grupo: str) -> pd.DataFram
 
 
 def plot_evolucao_predicoes_test(
-    df_temp: pd.DataFrame, col_bloco: str = 'mes_test', rotulo_bloco: str = 'Mês do Test',
-    figsize: Tuple[float, float] = (14, 5.2), filepath: Optional[Union[str, Path]] = None
+    df_temp: pd.DataFrame,
+    col_bloco: str = 'mes_test',
+    rotulo_bloco: str = 'Mês do Test',
+    taxa_ref_oot: Optional[float] = None,
+    prob_ref_oot: Optional[float] = None,
+    figsize: Tuple[float, float] = (14, 5.2),
+    filepath: Optional[Union[str, Path]] = None,
 ) -> None:
     """
-    Evolução temporal das predições no Test (sem ground-truth):
-    volume em barras ao fundo, taxa de fraude prevista (%) e score calibrado médio (%).
+    Evolução temporal do acionamento no Test (sem ground-truth):
+    volume em barras ao fundo, taxa de bloqueio (`pred_fraude = 1`), score calibrado médio (`prob_cal`)
+    e linha de referência opcional da janela OOT.
     """
     fig, ax = plt.subplots(figsize=figsize)
     ax_vol = ax.twinx()
@@ -9598,21 +9734,35 @@ def plot_evolucao_predicoes_test(
     ax.patch.set_visible(False)
 
     ax.plot(df_temp[col_bloco], df_temp['Taxa_Prevista_%'], color=COR_OOT, lw=2.6, marker='o', ms=6.5,
-            markerfacecolor='white', markeredgewidth=2, label='Taxa prevista (pred_fraude = 1)', zorder=3)
+            markerfacecolor='white', markeredgewidth=2, label='Taxa de bloqueio no Test (pred_fraude = 1)', zorder=3)
     ax.plot(df_temp[col_bloco], df_temp['Prob_Cal_Media_%'], color=PALETA_AZUL['acento'], lw=2.0, ls='--',
-            marker='s', ms=5, label='Score calibrado médio (prob_cal)', zorder=3)
+            marker='s', ms=5, label='Score calibrado médio no Test (prob_cal)', zorder=3)
+
+    if taxa_ref_oot is not None:
+        ax.axhline(taxa_ref_oot, color=COR_IN_TIME, lw=1.6, ls=':', zorder=2,
+                   label=f'Ref. taxa de bloqueio OOT ({taxa_ref_oot:.2f}%)')
+    if prob_ref_oot is not None:
+        ax.axhline(prob_ref_oot, color=PALETA_AZUL['principal'], lw=1.3, ls='-.', alpha=0.80, zorder=2,
+                   label=f'Ref. prob_cal média OOT ({prob_ref_oot:.2f}%)')
 
     for _, r in df_temp.iterrows():
-        ax.annotate(f"{r['Taxa_Prevista_%']:.2f}%", (r[col_bloco], r['Taxa_Prevista_%']),
-                    xytext=(0, 8), textcoords='offset points', ha='center', fontsize=8.5,
+        ax.annotate(f"{r['Taxa_Prevista_%']:.1f}%", (r[col_bloco], r['Taxa_Prevista_%']),
+                    xytext=(0, 8), textcoords='offset points', ha='center', fontsize=8.0,
                     fontweight='bold', color=COR_OOT)
 
-    ymax = max(df_temp['Taxa_Prevista_%'].max(), df_temp['Prob_Cal_Media_%'].max()) * 1.32
-    ax.set(xlabel=f'{rotulo_bloco} · barras cinza = volume de transações', ylabel='Taxa / Score (%)', ylim=(0, ymax))
-    ax.legend(loc='upper right', frameon=True, facecolor='white', edgecolor='white', framealpha=0.9)
-    _titulo_ax(ax, f'Comportamento Temporal das Predições no Test ({rotulo_bloco})',
-               f"Taxa prevista global: {df_temp['Prev_Fraudes'].sum() / df_temp['Transacoes'].sum() * 100:.2f}% "
-               f"| Score calibrado médio: {(df_temp['Prob_Cal_Media_%'] * df_temp['Transacoes']).sum() / df_temp['Transacoes'].sum():.2f}%")
+    ymax_base = max(
+        float(df_temp['Taxa_Prevista_%'].max()),
+        float(df_temp['Prob_Cal_Media_%'].max()),
+        float(taxa_ref_oot or 0.0),
+    )
+    ax.set(xlabel=f'{rotulo_bloco} · barras cinza = volume de transações', ylabel='Taxa / Score (%)', ylim=(0, ymax_base * 1.35))
+    ax.legend(loc='upper left', ncol=2, frameon=True, facecolor='white', edgecolor='white', framealpha=0.9)
+    taxa_global = df_temp['Prev_Fraudes'].sum() / df_temp['Transacoes'].sum() * 100
+    prob_global = (df_temp['Prob_Cal_Media_%'] * df_temp['Transacoes']).sum() / df_temp['Transacoes'].sum()
+    sub = f"Taxa de bloqueio global Test: {taxa_global:.2f}% | Score calibrado médio Test: {prob_global:.2f}%"
+    if taxa_ref_oot is not None:
+        sub += f" | Baseline OOT: {taxa_ref_oot:.2f}%"
+    _titulo_ax(ax, f'Monitoramento Temporal de Acionamento no Test ({rotulo_bloco})', sub)
     plt.tight_layout()
     _salvar_fig(fig, filepath)
 
@@ -9621,28 +9771,686 @@ def plot_predicoes_por_categoria(
     df_resumo: pd.DataFrame, col_cat: str, titulo: str, subtitulo: Optional[str] = None,
     figsize: Tuple[float, float] = (14, 4.8), filepath: Optional[Union[str, Path]] = None
 ) -> None:
-    """Painel enxuto (2 gráficos) de taxa prevista (%) e volume financeiro bloqueado (US$ mi) por segmento."""
+    """Painel enxuto (2 gráficos) de taxa de bloqueio (%) e GMV retido (US$ mi) por segmento."""
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
     x = np.arange(len(df_resumo))
     rotulos = df_resumo[col_cat].astype(str)
 
     bars1 = ax1.bar(x, df_resumo['Taxa_Prevista_%'], color=COR_OOT, width=0.58)
     ax1.bar_label(bars1, fmt='%.2f%%', padding=4, fontsize=9, fontweight='bold', color=PALETA_AZUL['texto'])
-    ax1.set(xticks=x, xticklabels=rotulos, ylabel='Taxa prevista (%)',
+    ax1.set(xticks=x, xticklabels=rotulos, ylabel='Taxa de bloqueio (%)',
             ylim=(0, df_resumo['Taxa_Prevista_%'].max() * 1.25))
     ax1.grid(axis='x', visible=False)
-    _titulo_ax(ax1, 'Taxa de Fraude Prevista (%)', 'Concentração de risco por segmento')
+    _titulo_ax(ax1, 'Taxa de Bloqueio Operacional (%)', 'Proporção com pred_fraude = 1 por segmento')
 
     vol_mi = df_resumo['Valor_Bloqueado_USD'] / 1e6
     bars2 = ax2.bar(x, vol_mi, color=PALETA_AZUL['principal'], width=0.58)
     ax2.bar_label(bars2, fmt='$%.2fM', padding=4, fontsize=9, fontweight='bold', color=PALETA_AZUL['texto'])
-    ax2.set(xticks=x, xticklabels=rotulos, ylabel='Valor bloqueado (US$ milhões)',
+    ax2.set(xticks=x, xticklabels=rotulos, ylabel='GMV retido (US$ milhões)',
             ylim=(0, max(vol_mi.max(), 0.01) * 1.25))
     ax2.grid(axis='x', visible=False)
-    _titulo_ax(ax2, 'Exposição Financeira Bloqueada (US$ mi)', 'Soma de amt_usd onde pred_fraude = 1')
+    _titulo_ax(ax2, 'GMV Retido sob Bloqueio (US$ mi)', 'Soma de amt_usd onde pred_fraude = 1')
 
     _titulo_fig(fig, titulo, subtitulo)
     plt.tight_layout()
+    _salvar_fig(fig, filepath)
+
+
+# ------------------------------------------------------------------------------
+# 8. HIPÓTESE DE THRESHOLD POR GRUPAMENTO (03_Segmentacao — Seção 7.0)
+# ------------------------------------------------------------------------------
+def clusterizar_base_treino_e_projetar(
+    X_train: pd.DataFrame,
+    X_val: pd.DataFrame,
+    train_df: pd.DataFrame,
+    val_df: pd.DataFrame,
+    X_oot: Optional[pd.DataFrame] = None,
+    oot_df: Optional[pd.DataFrame] = None,
+    features_cluster: Optional[List[str]] = None,
+    k: int = 4,
+    n_components_pca: int = 10,
+    random_state: int = 42,
+) -> Dict[str, Any]:
+    """
+    Clusteriza 100% da base de Treino (`X_train`, legítimas + fraudes) sem data leakage
+    usando `SimpleImputer(median) -> RobustScaler -> PCA(10D) -> KMeans(K)` ajustados
+    EXCLUSIVAMENTE no Treino, e projeta os grupamentos na Validação (`X_val`).
+
+    Ordena os IDs dos grupos (0 .. K-1) da maior para a menor taxa de fraude no Treino,
+    garantindo numeração determinística e interpretável (`G1` = maior risco ... `GK` = menor risco).
+    """
+    from sklearn.cluster import KMeans
+    from sklearn.decomposition import PCA
+    from sklearn.impute import SimpleImputer
+    from sklearn.pipeline import Pipeline
+    from sklearn.preprocessing import RobustScaler
+
+    cols = [c for c in (features_cluster or list(X_train.columns)) if c in X_train.columns]
+    n_comp = min(n_components_pca, len(cols))
+
+    pipe_cluster = Pipeline([
+        ('imputer', SimpleImputer(strategy='median')),
+        ('scaler', RobustScaler()),
+        ('pca', PCA(n_components=n_comp, random_state=random_state)),
+        ('kmeans', KMeans(n_clusters=k, random_state=random_state, n_init=10)),
+    ])
+
+    raw_train = pipe_cluster.fit_predict(X_train[cols])
+    raw_val = pipe_cluster.predict(X_val[cols])
+    raw_oot = pipe_cluster.predict(X_oot[cols]) if X_oot is not None else None
+
+    # Reordena IDs (0..k-1) por taxa de fraude decrescente no Treino
+    y_tr = np.asarray(train_df['isFraud'], dtype=float)
+    taxas_raw = {cid: float(y_tr[raw_train == cid].mean()) if (raw_train == cid).any() else 0.0 for cid in range(k)}
+    ordem_cids = sorted(range(k), key=lambda c: taxas_raw[c], reverse=True)
+    re_map = {old_cid: new_cid for new_cid, old_cid in enumerate(ordem_cids)}
+
+    g_train = np.vectorize(re_map.get)(raw_train)
+    g_val = np.vectorize(re_map.get)(raw_val)
+    g_oot = np.vectorize(re_map.get)(raw_oot) if raw_oot is not None else None
+
+    amt_tr = obter_amt_real(train_df, 'TransactionAmt')
+    prod_tr = train_df['ProductCD'].astype(str).values if 'ProductCD' in train_df.columns else np.full(len(train_df), 'W')
+
+    linhas = []
+    rotulos_map: Dict[int, str] = {}
+    for gid in range(k):
+        m_tr = (g_train == gid)
+        m_va = (g_val == gid)
+        prod_dom = pd.Series(prod_tr[m_tr]).value_counts().idxmax() if m_tr.any() else '-'
+        tkt_med = float(amt_tr[m_tr].mean()) if m_tr.any() else 0.0
+        tx_fr = float(y_tr[m_tr].mean() * 100) if m_tr.any() else 0.0
+        rotulo = f"G{gid + 1} (Prod {prod_dom} · Fraude {tx_fr:.1f}% · ${tkt_med:.0f})"
+        rotulos_map[gid] = rotulo
+        item = {
+            'Grupo_ID': gid,
+            'Grupamento': rotulo,
+            'Transacoes_Treino': int(m_tr.sum()),
+            '%_Treino': float(m_tr.mean() * 100),
+            '%_Validacao': float(m_va.mean() * 100),
+            'Produto_Dominante': prod_dom,
+            'Ticket_Medio_USD': tkt_med,
+            'Ticket_Mediano_USD': float(np.median(amt_tr[m_tr])) if m_tr.any() else 0.0,
+            'Taxa_Fraude_Treino_%': tx_fr,
+        }
+        if g_oot is not None:
+            item['%_OOT'] = float((g_oot == gid).mean() * 100)
+        linhas.append(item)
+
+    df_perfil = pd.DataFrame(linhas)
+    out = {
+        'k': k,
+        'grupos_train': g_train,
+        'grupos_val': g_val,
+        'rotulos_map': rotulos_map,
+        'df_perfil': df_perfil,
+        'pipeline_cluster': pipe_cluster,
+    }
+    if g_oot is not None:
+        out['grupos_oot'] = g_oot
+    return out
+
+
+def otimizar_thresholds_por_grupamento(
+    y_train,
+    prob_cal_train,
+    amt_train,
+    grupos_train,
+    rotulos_map: Optional[Dict[int, str]] = None,
+    threshold_fixo_global: float = 0.0390,
+    n_trials_optuna: int = 250,
+    random_state: int = 42,
+) -> Dict[str, Any]:
+    """
+    Determina o melhor threshold fixo `t_g` para cada grupamento `g` no OOF do Treino:
+      1. Busca Exata por grupamento (`otimizar_threshold_fixo` em cada grupo disjunto)
+      2. Otimização conjunta via Optuna (`TPESampler`) maximizando o Lucro Líquido Total no OOF.
+    """
+    import optuna
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+    y = np.asarray(y_train, dtype=int)
+    p = np.asarray(prob_cal_train, dtype=float)
+    a = np.asarray(amt_train, dtype=float)
+    g = np.asarray(grupos_train, dtype=int)
+    grupos_unicos = sorted(np.unique(g).tolist())
+    rotulos_map = rotulos_map or {gid: f'G{gid + 1}' for gid in grupos_unicos}
+
+    # 1. Busca exata vetorizada dentro de cada grupo + curvas de lucro para visualização
+    mapa_th_exato: Dict[int, float] = {}
+    curvas_por_grupo: Dict[str, pd.DataFrame] = {}
+    grade_plot = np.linspace(0.005, 0.20, 300)
+
+    for gid in grupos_unicos:
+        mask = (g == gid)
+        if mask.sum() > 0 and y[mask].sum() > 0:
+            res_exato = otimizar_threshold_fixo(y[mask], p[mask], a[mask], t_max=0.35)
+            th_g = float(res_exato['Threshold'])
+        else:
+            th_g = float(threshold_fixo_global)
+        mapa_th_exato[gid] = th_g
+        curvas_por_grupo[rotulos_map[gid]] = curva_lucro_threshold(
+            y[mask], p[mask], a[mask], np.union1d(grade_plot, [th_g, threshold_fixo_global])
+        )
+
+    # 2. Otimização conjunta via Optuna (TPESampler)
+    ganho_bloq_unit = np.where(y == 0, -0.04 * a, a)  # ganho marginal de bloquear vs. aprovar
+    base_aprovar_tudo = float(np.where(y == 0, 0.02 * a, -a).sum())
+
+    def _objective(trial):
+        th_vec = np.empty(len(p), dtype=float)
+        for gid in grupos_unicos:
+            t_g = trial.suggest_float(f't_g{gid}', 0.005, 0.25)
+            th_vec[g == gid] = t_g
+        bloq = (p >= th_vec)
+        return base_aprovar_tudo + float(ganho_bloq_unit[bloq].sum())
+
+    study = optuna.create_study(direction='maximize', sampler=optuna.samplers.TPESampler(seed=random_state))
+    # Enfileira referências iniciais (corte fixo global e solução analítica por grupo)
+    study.enqueue_trial({f't_g{gid}': float(np.clip(threshold_fixo_global, 0.005, 0.25)) for gid in grupos_unicos})
+    study.enqueue_trial({f't_g{gid}': float(np.clip(mapa_th_exato[gid], 0.005, 0.25)) for gid in grupos_unicos})
+    study.optimize(_objective, n_trials=n_trials_optuna, show_progress_bar=False)
+
+    mapa_th_optuna = {gid: float(study.best_params[f't_g{gid}']) for gid in grupos_unicos}
+
+    # 3. Tabela consolidada por grupamento no Treino (OOF)
+    linhas = []
+    for gid in grupos_unicos:
+        mask = (g == gid)
+        th_opt = mapa_th_optuna[gid]
+        th_ex = mapa_th_exato[gid]
+        r_fixo = calcular_score_financeiro(y[mask], p[mask] >= threshold_fixo_global, a[mask])
+        r_opt = calcular_score_financeiro(y[mask], p[mask] >= th_opt, a[mask])
+        linhas.append({
+            'Grupo_ID': gid,
+            'Grupamento': rotulos_map[gid],
+            'Transacoes_Treino': int(mask.sum()),
+            'Taxa_Fraude_%': float(y[mask].mean() * 100),
+            'Ticket_Medio_USD': float(a[mask].mean()),
+            'Prob_Cal_Media_%': float(p[mask].mean() * 100),
+            'Threshold_Fixo_Global_%': float(threshold_fixo_global * 100),
+            'Threshold_Optuna_%': float(th_opt * 100),
+            'Threshold_Exato_%': float(th_ex * 100),
+            'Delta_vs_Global_pp': float((th_opt - threshold_fixo_global) * 100),
+            'Lucro_OOF_Fixo_Global_USD': float(r_fixo['Resultado_Liquido']),
+            'Lucro_OOF_Grupamento_USD': float(r_opt['Resultado_Liquido']),
+            'Ganho_OOF_vs_Global_USD': float(r_opt['Resultado_Liquido'] - r_fixo['Resultado_Liquido']),
+            'Recall_%': float(r_opt['Recall'] * 100),
+            'Precision_%': float(r_opt['Precision'] * 100),
+            'Aprovacao_Legit_%': float(r_opt['Approval_Rate'] * 100),
+        })
+
+    return {
+        'df_thresholds': pd.DataFrame(linhas),
+        'mapa_th_optuna': mapa_th_optuna,
+        'mapa_th_exato': mapa_th_exato,
+        'curvas_por_grupo': curvas_por_grupo,
+        'study': study,
+    }
+
+
+def otimizar_hibrido_grupamento_exponencial_optuna(
+    y_train,
+    prob_cal_train,
+    amt_train,
+    grupos_train,
+    regra_dinamica: Dict[str, Any],
+    n_trials_optuna: int = 200,
+    random_state: int = 42,
+) -> Dict[int, float]:
+    """
+    Otimiza via Optuna um fator multiplicativo `alpha_g` por grupamento sobre a curva
+    exponencial por ticket `T_g(amt) = alpha_g * T_exp(amt)` no OOF do Treino.
+    """
+    import optuna
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+    y = np.asarray(y_train, dtype=int)
+    p = np.asarray(prob_cal_train, dtype=float)
+    a = np.asarray(amt_train, dtype=float)
+    g = np.asarray(grupos_train, dtype=int)
+    grupos_unicos = sorted(np.unique(g).tolist())
+
+    th_base = threshold_dinamico(a, regra_dinamica['t_min'], regra_dinamica['t_max'], regra_dinamica['k'])
+    ganho_bloq_unit = np.where(y == 0, -0.04 * a, a)
+    base_aprovar_tudo = float(np.where(y == 0, 0.02 * a, -a).sum())
+
+    def _obj_hib(trial):
+        fator = np.ones(len(p), dtype=float)
+        for gid in grupos_unicos:
+            fator[g == gid] = trial.suggest_float(f'alpha_g{gid}', 0.65, 1.45)
+        bloq = (p >= (th_base * fator))
+        return base_aprovar_tudo + float(ganho_bloq_unit[bloq].sum())
+
+    study = optuna.create_study(direction='maximize', sampler=optuna.samplers.TPESampler(seed=random_state))
+    study.enqueue_trial({f'alpha_g{gid}': 1.0 for gid in grupos_unicos})
+    study.optimize(_obj_hib, n_trials=n_trials_optuna, show_progress_bar=False)
+    return {gid: float(study.best_params[f'alpha_g{gid}']) for gid in grupos_unicos}
+
+
+def otimizar_exponencial_por_grupamento(
+    y_train,
+    prob_cal_train,
+    amt_train,
+    grupos_train,
+    rotulos_map: Optional[Dict[int, str]] = None,
+    regra_dinamica_global: Optional[Dict[str, Any]] = None,
+    n_trials_optuna: int = 250,
+    random_state: int = 42,
+) -> Dict[str, Any]:
+    """
+    Otimiza via Optuna (TPESampler) uma curva de threshold dinâmico exponencial própria
+    para CADA grupamento `g` no OOF do Treino:
+        T_g(amt) = t_min_g + (t_max_g - t_min_g) * exp(-k_g * amt)
+    """
+    import optuna
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+    y = np.asarray(y_train, dtype=int)
+    p = np.asarray(prob_cal_train, dtype=float)
+    a = np.asarray(amt_train, dtype=float)
+    g = np.asarray(grupos_train, dtype=int)
+    grupos_unicos = sorted(np.unique(g).tolist())
+    rotulos_map = rotulos_map or {gid: f'G{gid + 1}' for gid in grupos_unicos}
+
+    t_min_glob = float((regra_dinamica_global or {}).get('t_min', 0.0381))
+    t_max_glob = float((regra_dinamica_global or {}).get('t_max', 0.0509))
+    k_glob = float((regra_dinamica_global or {}).get('k', 0.01953))
+
+    mapa_params_exp: Dict[int, Dict[str, float]] = {}
+    linhas = []
+
+    for gid in grupos_unicos:
+        mask = (g == gid)
+        y_g, p_g, a_g = y[mask], p[mask], a[mask]
+        th_glob_g = threshold_dinamico(a_g, t_min_glob, t_max_glob, k_glob)
+        r_glob = calcular_score_financeiro(y_g, p_g >= th_glob_g, a_g)
+
+        if len(y_g) > 0 and y_g.sum() > 0:
+            ganho_bloq_g = np.where(y_g == 0, -0.04 * a_g, a_g)
+            base_aprov_g = float(np.where(y_g == 0, 0.02 * a_g, -a_g).sum())
+
+            def _obj_exp_g(trial, _p=p_g, _a=a_g, _gb=ganho_bloq_g, _ba=base_aprov_g):
+                t_max = trial.suggest_float('t_max', 0.030, 0.300)
+                t_min = trial.suggest_float('t_min', 0.005, max(0.006, t_max - 0.005))
+                k = trial.suggest_float('k', 0.0005, 0.080, log=True)
+                th = threshold_dinamico(_a, t_min, t_max, k)
+                return _ba + float(_gb[_p >= th].sum())
+
+            st_g = optuna.create_study(
+                direction='maximize',
+                sampler=optuna.samplers.TPESampler(seed=random_state + int(gid)),
+            )
+            st_g.enqueue_trial({
+                't_max': float(np.clip(t_max_glob, 0.030, 0.300)),
+                't_min': float(np.clip(t_min_glob, 0.005, max(0.006, t_max_glob - 0.005))),
+                'k': float(np.clip(k_glob, 0.0005, 0.080)),
+            })
+            st_g.optimize(_obj_exp_g, n_trials=n_trials_optuna, show_progress_bar=False)
+            best_p = {
+                't_min': float(st_g.best_params['t_min']),
+                't_max': float(st_g.best_params['t_max']),
+                'k': float(st_g.best_params['k']),
+            }
+        else:
+            best_p = {'t_min': t_min_glob, 't_max': t_max_glob, 'k': k_glob}
+
+        mapa_params_exp[gid] = best_p
+        th_opt_g = threshold_dinamico(a_g, best_p['t_min'], best_p['t_max'], best_p['k'])
+        r_opt = calcular_score_financeiro(y_g, p_g >= th_opt_g, a_g)
+
+        linhas.append({
+            'Grupo_ID': gid,
+            'Grupamento': rotulos_map[gid],
+            'Transacoes_Treino': int(mask.sum()),
+            'Taxa_Fraude_%': float(y_g.mean() * 100),
+            'Ticket_Medio_USD': float(a_g.mean()),
+            't_max_Grupo_%': float(best_p['t_max'] * 100),
+            't_min_Grupo_%': float(best_p['t_min'] * 100),
+            'k_Grupo': float(best_p['k']),
+            'Threshold_Medio_Grupo_%': float(th_opt_g.mean() * 100),
+            'Lucro_OOF_Exp_Global_USD': float(r_glob['Resultado_Liquido']),
+            'Lucro_OOF_Exp_Grupo_USD': float(r_opt['Resultado_Liquido']),
+            'Ganho_OOF_vs_Exp_Global_USD': float(r_opt['Resultado_Liquido'] - r_glob['Resultado_Liquido']),
+            'Recall_%': float(r_opt['Recall'] * 100),
+            'Precision_%': float(r_opt['Precision'] * 100),
+            'Aprovacao_Legit_%': float(r_opt['Approval_Rate'] * 100),
+        })
+
+    return {
+        'df_exp_grupos': pd.DataFrame(linhas),
+        'mapa_params_exp': mapa_params_exp,
+    }
+
+
+def aplicar_threshold_exponencial_por_grupamento(
+    amt,
+    grupos,
+    mapa_params_exp: Dict[int, Dict[str, float]],
+    regra_dinamica_global: Dict[str, Any],
+) -> np.ndarray:
+    """Calcula vetorizadamente o threshold exponencial específico `T_g(amt)` de cada grupamento."""
+    a = np.asarray(amt, dtype=float)
+    g = np.asarray(grupos, dtype=int)
+    th_out = threshold_dinamico(a, regra_dinamica_global['t_min'], regra_dinamica_global['t_max'], regra_dinamica_global['k'])
+    for gid, p_exp in mapa_params_exp.items():
+        m = (g == int(gid))
+        if m.any():
+            th_out[m] = threshold_dinamico(a[m], p_exp['t_min'], p_exp['t_max'], p_exp['k'])
+    return th_out
+
+
+def plot_curvas_exponenciais_por_grupamento(
+    res_exp_k4: Dict[str, Any],
+    regra_dinamica_global: Dict[str, Any],
+    amt_max: float = 600.0,
+    figsize: Tuple[float, float] = (15, 5.4),
+    filepath: Optional[Union[str, Path]] = None,
+) -> None:
+    """
+    Painel duplo das curvas exponenciais por grupamento (K=4):
+      1. Curva T_g(amt) vs. Valor da Transação (US$) para cada grupo frente ao Exponencial Global
+      2. Amplitude [t_min_g, t_max_g] de cada grupo comparada à banda do Exponencial Global.
+    """
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
+    cores_g = [PALETA_AZUL['marinho'], PALETA_AZUL['principal'], PALETA_AZUL['ciano'], PALETA_AZUL['claro']]
+    df_exp = res_exp_k4['df_exp_grupos']
+    mapa_p = res_exp_k4['mapa_params_exp']
+    eixo_amt = np.linspace(0.0, amt_max, 400)
+
+    for idx, row in df_exp.iterrows():
+        gid = int(row['Grupo_ID'])
+        p_g = mapa_p[gid]
+        cor = cores_g[idx % len(cores_g)]
+        curva_g = threshold_dinamico(eixo_amt, p_g['t_min'], p_g['t_max'], p_g['k']) * 100
+        rot_curto = row['Grupamento'].split(' (')[0]
+        ax1.plot(
+            eixo_amt, curva_g, color=cor, lw=2.3,
+            label=f"{rot_curto}: [{row['t_min_Grupo_%']:.2f}% → {row['t_max_Grupo_%']:.2f}%] (k={row['k_Grupo']:.4f})",
+        )
+
+    curva_glob = threshold_dinamico(
+        eixo_amt, regra_dinamica_global['t_min'], regra_dinamica_global['t_max'], regra_dinamica_global['k']
+    ) * 100
+    ax1.plot(
+        eixo_amt, curva_glob, color=PALETA_AZUL['texto'], lw=2.2, ls='--',
+        label=f"Exponencial Global: [{regra_dinamica_global['t_min']*100:.2f}% → {regra_dinamica_global['t_max']*100:.2f}%]",
+    )
+    ax1.set(xlim=(0, amt_max), xlabel='Valor da Transação (US$)', ylabel='Threshold dinâmico T_g(amt) (%)')
+    ax1.legend(loc='upper right', frameon=True, facecolor='white', edgecolor='white', fontsize=8.3)
+    _titulo_ax(ax1, 'Curvas Dinâmicas Exponenciais por Grupamento (K=4)',
+               'Decaimento do ponto de corte conforme o valor da transação dentro de cada grupo')
+
+    y_pos = np.arange(len(df_exp))
+    rotulos_curtos = [r.split(' · ')[0] + ')' if ' · ' in r else r for r in df_exp['Grupamento']]
+    for idx, row in df_exp.iterrows():
+        cor = cores_g[idx % len(cores_g)]
+        xmin, xmax = float(row['t_min_Grupo_%']), float(row['t_max_Grupo_%'])
+        ax2.hlines(idx, xmin, xmax, color=cor, lw=6, alpha=0.88)
+        ax2.scatter([xmin, xmax], [idx, idx], color=cor, s=65, zorder=4, edgecolor='white', lw=1.2)
+        ax2.text(xmax + 0.18, idx, f"{xmin:.2f}% – {xmax:.2f}%", va='center', fontsize=8.5,
+                 fontweight='bold', color=PALETA_AZUL['texto'])
+
+    t_min_glob_pct = float(regra_dinamica_global['t_min'] * 100)
+    t_max_glob_pct = float(regra_dinamica_global['t_max'] * 100)
+    ax2.axvspan(t_min_glob_pct, t_max_glob_pct, color=PALETA_AZUL['ciano_claro'], alpha=0.22, zorder=0,
+                label=f'Faixa Exponencial Global [{t_min_glob_pct:.2f}% – {t_max_glob_pct:.2f}%]')
+    ax2.set(
+        yticks=y_pos, yticklabels=rotulos_curtos,
+        xlabel='Intervalo [t_min (alto ticket) — t_max (micro-compra)] (%)',
+        xlim=(0, max(float(df_exp['t_max_Grupo_%'].max()), t_max_glob_pct) * 1.28),
+    )
+    ax2.invert_yaxis()
+    ax2.grid(axis='y', visible=False)
+    ax2.legend(loc='lower right', frameon=True, facecolor='white', edgecolor='white', fontsize=8.5)
+    _titulo_ax(ax2, 'Amplitude [t_min, t_max] por Grupamento vs. Global',
+               'Comparação da banda de variação de corte aprendida em cada macrogrupo')
+
+    plt.tight_layout()
+    _salvar_fig(fig, filepath)
+
+
+def comparar_estrategias_threshold_grupamento(
+    bases_avaliacao: Dict[str, Dict[str, Any]],
+    threshold_fixo_global: float,
+    regra_dinamica: Dict[str, Any],
+    mapa_th_k4: Dict[int, float],
+    mapa_th_k10: Optional[Dict[int, float]] = None,
+    mapa_alpha_hibrido_k4: Optional[Dict[int, float]] = None,
+    mapa_exp_k4: Optional[Dict[int, Dict[str, float]]] = None,
+    mapa_exp_k10: Optional[Dict[int, Dict[str, float]]] = None,
+) -> pd.DataFrame:
+    """
+    Compara financeiramente e operacionalmente as políticas de corte sobre o mesmo modelo (`LGBM_Otimizado`):
+      - Sem Modelo
+      - Fixo Global Ótimo
+      - Fixo por Grupamento (K=4 e K=10 · Optuna)
+      - Dinâmico Exponencial Global (Atual)
+      - Dinâmico Exponencial por Grupamento (K=4 e K=10 · Optuna)
+      - Híbrido Grupamento K=4 × Exponencial (Optuna) [se informado]
+    """
+    linhas = []
+    for nome_base, d in bases_avaliacao.items():
+        y = np.asarray(d['y'], dtype=int)
+        p_cal = np.asarray(d['prob_cal'], dtype=float)
+        amt = np.asarray(d['amt'], dtype=float)
+        g4 = np.asarray(d['grupos_k4'], dtype=int)
+        th_exp = threshold_dinamico(amt, regra_dinamica['t_min'], regra_dinamica['t_max'], regra_dinamica['k'])
+        th_k4 = np.vectorize(lambda cid: mapa_th_k4.get(int(cid), threshold_fixo_global))(g4)
+
+        politicas: Dict[str, np.ndarray] = {
+            '1. Sem Modelo': np.zeros(len(p_cal), dtype=bool),
+            '2. Fixo Global Ótimo': p_cal >= threshold_fixo_global,
+            '3. Fixo por Grupamento (K=4 · Optuna)': p_cal >= th_k4,
+        }
+        if mapa_th_k10 is not None and 'grupos_k10' in d:
+            g10 = np.asarray(d['grupos_k10'], dtype=int)
+            th_k10 = np.vectorize(lambda cid: mapa_th_k10.get(int(cid), threshold_fixo_global))(g10)
+            politicas['4. Fixo por Grupamento (K=10 · Optuna)'] = p_cal >= th_k10
+
+        politicas['5. Dinâmico Exponencial Global (Atual)'] = p_cal >= th_exp
+
+        if mapa_exp_k4 is not None:
+            th_exp_k4 = aplicar_threshold_exponencial_por_grupamento(amt, g4, mapa_exp_k4, regra_dinamica)
+            politicas['6. Dinâmico Exponencial por Grupamento (K=4)'] = p_cal >= th_exp_k4
+
+        if mapa_exp_k10 is not None and 'grupos_k10' in d:
+            g10 = np.asarray(d['grupos_k10'], dtype=int)
+            th_exp_k10 = aplicar_threshold_exponencial_por_grupamento(amt, g10, mapa_exp_k10, regra_dinamica)
+            politicas['7. Dinâmico Exponencial por Grupamento (K=10)'] = p_cal >= th_exp_k10
+
+        if mapa_alpha_hibrido_k4 is not None:
+            fator_h = np.vectorize(lambda cid: mapa_alpha_hibrido_k4.get(int(cid), 1.0))(g4)
+            politicas['8. Híbrido Escalar K=4 × Exponencial'] = p_cal >= (th_exp * fator_h)
+
+        lucro_exp = float(
+            calcular_score_financeiro(y, politicas['5. Dinâmico Exponencial Global (Atual)'], amt)['Resultado_Liquido']
+        )
+
+        for pol, bloq in politicas.items():
+            r = calcular_score_financeiro(y, bloq, amt)
+            linhas.append({
+                'Base': nome_base,
+                'Política': pol,
+                'Lucro Líquido (US$)': float(r['Resultado_Liquido']),
+                'Δ vs. Exponencial Global (US$)': float(r['Resultado_Liquido'] - lucro_exp),
+                'Receita VN (+2%)': float(r['Receita_VN']),
+                'Perda FP (−2%)': float(r['Penalidade_FP']),
+                'Chargeback FN (−100%)': float(r['Prejuizo_FN']),
+                'Aceitação Geral (%)': float((1 - (r['Qtd_VP'] + r['Qtd_FP']) / max(1, len(bloq))) * 100),
+                'Aprovação Legítimas (%)': float(r['Approval_Rate'] * 100),
+                'Recall (%)': float(r['Recall'] * 100),
+                'Precision (%)': float(r['Precision'] * 100),
+            })
+
+    return pd.DataFrame(linhas)
+
+
+def plot_thresholds_por_grupamento(
+    res_otim_k4: Dict[str, Any],
+    threshold_fixo_global: float,
+    regra_dinamica: Dict[str, Any],
+    figsize: Tuple[float, float] = (15, 5.4),
+    filepath: Optional[Union[str, Path]] = None,
+) -> None:
+    """
+    Painel duplo da otimização por grupamento (K=4):
+      1. Curvas de Lucro Líquido no Treino (OOF) por threshold para cada grupamento
+      2. Comparação dos thresholds ótimos por grupamento vs. Fixo Global e faixa do Dinâmico Exponencial.
+    """
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
+    cores_g = [PALETA_AZUL['marinho'], PALETA_AZUL['principal'], PALETA_AZUL['ciano'], PALETA_AZUL['claro']]
+    df_th = res_otim_k4['df_thresholds']
+    curvas = res_otim_k4['curvas_por_grupo']
+
+    for idx, row in df_th.iterrows():
+        rot = row['Grupamento']
+        cor = cores_g[idx % len(cores_g)]
+        cv = curvas[rot]
+        ax1.plot(cv['Threshold'] * 100, cv['Lucro'] / 1e3, color=cor, lw=2.2, label=rot.split(' (')[0] + f" (t*={row['Threshold_Optuna_%']:.2f}%)")
+        th_ot = row['Threshold_Optuna_%'] / 100.0
+        luc_ot = row['Lucro_OOF_Grupamento_USD'] / 1e3
+        ax1.scatter([th_ot * 100], [luc_ot], color=cor, s=55, zorder=5, edgecolor='white', lw=1.2)
+
+    ax1.axvline(threshold_fixo_global * 100, color=PALETA_AZUL['texto_sec'], ls='--', lw=1.4,
+                label=f'Fixo Global ({threshold_fixo_global*100:.2f}%)')
+    ax1.set(xlim=(0.5, 15.0), xlabel='Threshold de probabilidade calibrada (%)', ylabel='Lucro Líquido OOF (US$ mil)')
+    ax1.legend(loc='lower right', frameon=True, facecolor='white', edgecolor='white', fontsize=8.5)
+    _titulo_ax(ax1, 'Curva de Lucro OOF por Grupamento (K=4)', 'Cada grupo atinge seu ótimo em um ponto distinto')
+
+    y_pos = np.arange(len(df_th))
+    rotulos_curtos = [r.split(' · ')[0] + ')' if ' · ' in r else r for r in df_th['Grupamento']]
+    bars = ax2.barh(y_pos, df_th['Threshold_Optuna_%'], color=cores_g[:len(df_th)], height=0.55, alpha=0.92)
+    ax2.bar_label(bars, fmt='%.2f%%', padding=5, fontsize=9, fontweight='bold', color=PALETA_AZUL['texto'])
+
+    t_min_pct = float(regra_dinamica['t_min'] * 100)
+    t_max_pct = float(regra_dinamica['t_max'] * 100)
+    ax2.axvspan(t_min_pct, t_max_pct, color=PALETA_AZUL['ciano_claro'], alpha=0.22, zorder=0,
+                label=f'Faixa Exponencial [{t_min_pct:.2f}% – {t_max_pct:.2f}%]')
+    ax2.axvline(threshold_fixo_global * 100, color=PALETA_AZUL['texto_sec'], ls='--', lw=1.5,
+                label=f'Fixo Global ({threshold_fixo_global*100:.2f}%)')
+
+    ax2.set(yticks=y_pos, yticklabels=rotulos_curtos, xlabel='Threshold ótimo de bloqueio (%)',
+            xlim=(0, max(float(df_th['Threshold_Optuna_%'].max()), t_max_pct) * 1.28))
+    ax2.invert_yaxis()
+    ax2.grid(axis='y', visible=False)
+    ax2.legend(loc='lower right', frameon=True, facecolor='white', edgecolor='white', fontsize=8.5)
+    _titulo_ax(ax2, 'Thresholds por Grupamento vs. Faixa Exponencial',
+               'Comparação dos cortes fixos por cluster com a banda dinâmica por valor')
+
+    plt.tight_layout()
+    _salvar_fig(fig, filepath)
+
+
+def plot_benchmark_grupamento_vs_exponencial(
+    df_comp: pd.DataFrame,
+    figsize: Tuple[float, float] = (16.5, 5.2),
+    filepath: Optional[Union[str, Path]] = None,
+) -> None:
+    """
+    Compara o Lucro Líquido (US$ mil) na Validação (In-Time) e o Trade-off Aceitação × Recall
+    entre Fixo Global, Fixo por Grupamento (K=4 e K=10), Dinâmico Exponencial Global e Exponencial por Grupamento.
+    """
+    df_plot = df_comp[df_comp['Política'] != '1. Sem Modelo'].copy()
+    base_ref = 'Validação' if 'Validação' in df_plot['Base'].values else df_plot['Base'].iloc[-1]
+    sub_ref = df_plot[df_plot['Base'] == base_ref].reset_index(drop=True)
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
+    paleta_pol = [
+        PALETA_AZUL['cinza'],
+        PALETA_AZUL['claro'],
+        PALETA_AZUL['ciano_claro'],
+        PALETA_AZUL['marinho'],
+        PALETA_AZUL['principal'],
+        PALETA_AZUL['medio'],
+        PALETA_AZUL['ciano'],
+    ]
+    marcadores = ['s', '^', 'v', '*', 'D', 'P', 'X']
+
+    y_pos = np.arange(len(sub_ref))
+    nomes_curtos = [p.split('. ', 1)[-1] for p in sub_ref['Política']]
+    vals_val = sub_ref['Lucro Líquido (US$)'].values / 1e3
+    cores_barras = [paleta_pol[i % len(paleta_pol)] for i in range(len(sub_ref))]
+
+    bars = ax1.barh(y_pos, vals_val, color=cores_barras, height=0.58, alpha=0.93)
+    for bar, (_, r) in zip(bars, sub_ref.iterrows()):
+        delta = r['Δ vs. Exponencial Global (US$)']
+        sinal = f"({delta:+,.0f} US$)" if abs(delta) >= 1 else "(Referência)"
+        ax1.text(
+            bar.get_width() + 0.35,
+            bar.get_y() + bar.get_height() / 2,
+            f"$ {r['Lucro Líquido (US$)']/1e3:.2f}k  {sinal}",
+            va='center',
+            fontsize=8.3,
+            fontweight='bold',
+            color=PALETA_AZUL['texto'],
+        )
+
+    xmax = max(float(vals_val.max()), 1.0)
+    ax1.set(yticks=y_pos, yticklabels=nomes_curtos, xlabel='Lucro Líquido na Validação (US$ mil)', xlim=(0, xmax * 1.45))
+    ax1.invert_yaxis()
+    ax1.grid(axis='y', visible=False)
+    _titulo_ax(ax1, f'Lucro Líquido por Estratégia ({base_ref})',
+               'Avaliação fora do treino na partição de Validação (In-Time)')
+
+    for i, r in sub_ref.iterrows():
+        cor = paleta_pol[i % len(paleta_pol)]
+        nome_curto = r['Política'].split('. ', 1)[-1]
+        eh_atual = 'Exponencial Global (Atual)' in nome_curto
+        mk = '*' if eh_atual else marcadores[i % len(marcadores)]
+        sz = 280 if eh_atual else 125
+        z = 6 if eh_atual else 4
+        ax2.scatter(
+            r['Aceitação Geral (%)'],
+            r['Recall (%)'],
+            s=sz,
+            marker=mk,
+            color=cor,
+            edgecolor='white',
+            lw=1.3,
+            alpha=0.95,
+            zorder=z,
+            label=f"{nome_curto} ($ {r['Lucro Líquido (US$)']/1e3:.1f}k)",
+        )
+        if eh_atual:
+            ax2.annotate(
+                f"Atual ($ {r['Lucro Líquido (US$)']/1e3:.1f}k)",
+                (r['Aceitação Geral (%)'], r['Recall (%)']),
+                xytext=(10, 10),
+                textcoords='offset points',
+                fontsize=8.6,
+                fontweight='bold',
+                color=cor,
+                arrowprops=dict(arrowstyle='->', color=cor, lw=1.0, shrinkA=2, shrinkB=4),
+            )
+
+    x_vals = sub_ref['Aceitação Geral (%)'].values
+    y_vals = sub_ref['Recall (%)'].values
+    dx = max(float(x_vals.max() - x_vals.min()), 0.5)
+    dy = max(float(y_vals.max() - y_vals.min()), 0.5)
+    ax2.set(
+        xlim=(float(x_vals.min()) - 0.16 * dx, float(x_vals.max()) + 0.18 * dx),
+        ylim=(float(y_vals.min()) - 0.16 * dy, float(y_vals.max()) + 0.18 * dy),
+        xlabel='Aceitação Geral de Pedidos (%) → menor atrito',
+        ylabel='Recall de Fraudes (%) → maior captura',
+    )
+    ax2.legend(
+        loc='center left',
+        bbox_to_anchor=(1.03, 0.5),
+        ncol=1,
+        frameon=True,
+        facecolor='white',
+        edgecolor=PALETA_AZUL['cinza_claro'],
+        title='Políticas (Lucro na Validação)',
+        title_fontsize=8.8,
+        fontsize=8.3,
+        labelspacing=0.65,
+        markerscale=0.95,
+    )
+    _titulo_ax(ax2, f'Trade-off Aceitação × Recall ({base_ref})',
+               'Canto superior direito = mais pedidos aprovados com maior captura de fraude')
+
+    plt.tight_layout(w_pad=2.5)
     _salvar_fig(fig, filepath)
 
 
@@ -9762,8 +10570,20 @@ __all__ = [
     'aplicar_regra_dinamica',
     'aplicar_fe_ieee_cis_base',
     'preparar_dados_teste_inferencia',
+    'comparar_escoragem_particoes',
+    'relatorio_psi_vs_importancia_modelo',
     'resumir_predicoes_test',
     'plot_evolucao_predicoes_test',
     'plot_predicoes_por_categoria',
+    # Hipótese de threshold por grupamento (03_Segmentacao — Seção 7.0)
+    'clusterizar_base_treino_e_projetar',
+    'otimizar_thresholds_por_grupamento',
+    'otimizar_hibrido_grupamento_exponencial_optuna',
+    'otimizar_exponencial_por_grupamento',
+    'aplicar_threshold_exponencial_por_grupamento',
+    'comparar_estrategias_threshold_grupamento',
+    'plot_thresholds_por_grupamento',
+    'plot_curvas_exponenciais_por_grupamento',
+    'plot_benchmark_grupamento_vs_exponencial',
 ]
 
