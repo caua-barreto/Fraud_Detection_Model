@@ -3913,7 +3913,7 @@ def preparar_dados_modelagem(
     - Teste de validação (`test_ratio`, padrão 20% seguintes)
     - Out-of-Time final (`1 - train_ratio - test_ratio`, padrão 20% finais cegos)
 
-    Aplica ancoragem de drift nas colunas D, engenharia de grupo e frequency encoding
+    Aplica engenharia de grupo e frequency encoding
     fitados EXCLUSIVAMENTE no Treino (`train_df`), ordinal encoding sem leakage, cálculo
     da taxa de desbalanceamento e blocos mensais (`grupos_mes`) apenas no Treino.
     """
@@ -3934,14 +3934,7 @@ def preparar_dados_modelagem(
     test_df  = df_sorted.iloc[idx_train:idx_test].copy()
     oot_df   = df_sorted.iloc[idx_test:].copy()
 
-    # 2. Normalização de Drift nas Colunas D (Transformação determinística linha a linha)
-    for df_part in (train_df, test_df, oot_df):
-        dia_tx = df_part["TransactionDT"] / (3600.0 * 24.0)
-        cols_d = [c for c in df_part.columns if c.startswith("D") and c[1:].isdigit()]
-        for col in cols_d:
-            df_part[f"{col}_ancora"] = (df_part[col] - dia_tx).astype("float32")
-        if cols_d:
-            df_part.drop(columns=cols_d, inplace=True)
+    # 2. (Sem ancoragem das colunas D) — as colunas `delta_D*` seguem na escala original do 01_EDA.
 
     # 3. Engenharia de Grupo fitada EXCLUSIVAMENTE no Treino (Prevenção estrita de Leakage)
     novas_cols_grupo = []
@@ -6128,13 +6121,17 @@ def preparar_dados_clusterizacao(
     max_ohe_cardinalidade: int = 15,
     aplicar_log1p_assimetricas: bool = True,
     limiar_skew_log: float = 1.0,
-    corrigir_drift_d: bool = True,
+    corrigir_drift_d: bool = False,
 ) -> Tuple[np.ndarray, pd.DataFrame, List[str], Any]:
     """Prepara matriz numérica limpa e escalada (RobustScaler) para clusterização de fraudes.
 
+    O estado ajustado (mapas de frequência, dummies, colunas em log1p e ordem das features)
+    fica salvo em `preprocessador.estado_clusterizacao_`, permitindo aplicar a mesma
+    transformação a novas fraudes via `aplicar_preparo_clusterizacao`.
+    `corrigir_drift_d` é mantido apenas por compatibilidade e é ignorado (sem ancoragem das colunas D).
+
     Etapas aplicadas:
-    1. Ancoragem temporal das colunas D1..D15 (`D - TransactionDT / 86400`), revertendo
-       `expm1` caso alguma coluna D já tenha vindo em escala `log1p` do 01_EDA.
+    1. (Sem ancoragem das colunas D — `delta_D*` seguem na escala original do 01_EDA.)
     2. Remoção de IDs brutos e timestamps arbitrários (`TransactionID`, `TransactionDT`,
        `card1`, `card2`, `addr1`, `addr2`, além de `isFraud`).
     3. Codificação de categóricas: `pd.get_dummies(..., dtype=float)` para baixa cardinalidade
@@ -6149,21 +6146,6 @@ def preparar_dados_clusterizacao(
     from sklearn.preprocessing import RobustScaler
 
     df_work = df_fraude.copy()
-
-    # 1. Correção de drift das colunas D1..D15 antes de remover TransactionDT
-    cols_d_ancoradas: List[str] = []
-    if corrigir_drift_d and "TransactionDT" in df_work.columns:
-        dias_dt = df_work["TransactionDT"].astype("float64") / 86400.0
-        for i in range(1, 16):
-            col_d = f"D{i}"
-            if col_d in df_work.columns and pd.api.types.is_numeric_dtype(df_work[col_d]):
-                serie_d = df_work[col_d].astype("float64")
-                valid = serie_d.dropna()
-                if not valid.empty and valid.min() >= 0 and valid.max() <= 10.0:
-                    # Caso D tenha passado por log1p no EDA, retorna à escala de dias antes de ancorar
-                    serie_d = np.expm1(serie_d)
-                df_work[col_d] = serie_d - dias_dt
-                cols_d_ancoradas.append(col_d)
 
     # 2. Remoção de IDs brutos, timestamps e target
     padrao_remover = ["TransactionID", "isFraud", "TransactionDT", "card1", "card2", "addr1", "addr2"]
@@ -6194,9 +6176,11 @@ def preparar_dados_clusterizacao(
 
     # Frequency encoding para alta cardinalidade (cria/atualiza versão normalizada no recorte)
     cols_freq_criadas: List[str] = []
+    mapas_freq: Dict[str, Dict[str, float]] = {}
     for col in cols_alta:
         serie_str = df_work[col].astype("object").fillna("missing").astype(str)
         freqs = serie_str.value_counts(normalize=True)
+        mapas_freq[col] = freqs.to_dict()
         nome_freq = f"{col}_cluster_freq"
         df_work[nome_freq] = serie_str.map(freqs).astype("float64")
         cols_freq_criadas.append(nome_freq)
@@ -6240,14 +6224,63 @@ def preparar_dados_clusterizacao(
     ])
     X_tratado = preprocessador.fit_transform(df_work)
 
+    # Estado ajustado no recorte de referência (reaplicável a novas fraudes sem re-ajuste)
+    preprocessador.estado_clusterizacao_ = {
+        "cols_remover": list(lista_remover),
+        "cols_alta": list(cols_alta),
+        "mapas_freq": mapas_freq,
+        "cols_baixa": list(cols_baixa),
+        "cols_ohe": list(cols_ohe_criadas),
+        "cols_log1p": list(cols_log1p_aplicadas),
+        "feature_names": list(feature_names),
+    }
+
     print("Pré-processamento de clusterização concluído:")
     print(f" - Matriz final escalada: {X_tratado.shape[0]:,} linhas x {X_tratado.shape[1]} features")
-    print(f" - D1..D15 ancoradas (drift): {len(cols_d_ancoradas)} {cols_d_ancoradas}")
     print(f" - Dummies (baixa cardinalidade): {len(cols_ohe_criadas)} colunas de {len(cols_baixa)} originais")
     print(f" - Frequency encoding (alta card.): {len(cols_freq_criadas)} colunas {cols_alta}")
     print(f" - Log1p adicional (skew > {limiar_skew_log}): {len(cols_log1p_aplicadas)} colunas")
 
     return X_tratado, df_work, feature_names, preprocessador
+
+
+def aplicar_preparo_clusterizacao(df_novo: pd.DataFrame, preprocessador: Any) -> np.ndarray:
+    """Aplica a novas fraudes (ex.: Validação/OOT) o mesmo pré-processamento ajustado em
+    `preparar_dados_clusterizacao` (mapas de frequência, dummies, log1p, imputação e escala),
+    sem re-ajustar nada. Categorias inéditas recebem frequência 0 e dummies zeradas."""
+    estado = preprocessador.estado_clusterizacao_
+    df_work = df_novo.drop(columns=[c for c in estado["cols_remover"] if c in df_novo.columns])
+
+    for col in estado["cols_alta"]:
+        if col in df_work.columns:
+            serie_str = df_work[col].astype("object").fillna("missing").astype(str)
+        else:
+            serie_str = pd.Series("missing", index=df_work.index)
+        df_work[f"{col}_cluster_freq"] = serie_str.map(estado["mapas_freq"][col]).fillna(0.0).astype("float64")
+        df_work = df_work.drop(columns=[col], errors="ignore")
+
+    cols_baixa = [c for c in estado["cols_baixa"] if c in df_work.columns]
+    for col in cols_baixa:
+        df_work[col] = df_work[col].astype("object").fillna("missing").astype(str)
+    if cols_baixa:
+        df_work = pd.get_dummies(df_work, columns=cols_baixa, drop_first=False, dtype=float)
+
+    df_work = df_work.reindex(columns=estado["feature_names"])
+    cols_ohe = [c for c in estado["cols_ohe"] if c in df_work.columns]
+    df_work[cols_ohe] = df_work[cols_ohe].fillna(0.0)
+    df_work = df_work.astype("float64").replace([np.inf, -np.inf], np.nan)
+
+    for col in estado["cols_log1p"]:
+        df_work[col] = np.log1p(df_work[col].clip(lower=0))
+
+    return preprocessador.transform(df_work)
+
+
+def recortar_treino_temporal(df_master: pd.DataFrame, train_ratio: float = 0.60) -> pd.DataFrame:
+    """Retorna o bloco de Treino (primeiros `train_ratio` cronológicos por `TransactionDT`),
+    com o mesmo corte de `preparar_dados_modelagem` (Validação e OOT ficam de fora)."""
+    df_sorted = df_master.sort_values("TransactionDT").reset_index(drop=True)
+    return df_sorted.iloc[:int(len(df_sorted) * train_ratio)].copy()
 
 
 def projetar_pca(
@@ -7332,7 +7365,7 @@ def plot_heatmap_zscore_clusters(
     nome_arquivo: Optional[str] = None,
     save_dir: Optional[Union[str, Path]] = None,
 ) -> plt.Figure:
-    """Plota heatmap de Z-Score das médias contínuas por cluster (ancora D* e reconverte log1p se necessário)."""
+    """Plota heatmap de Z-Score das médias contínuas por cluster (reconverte log1p se necessário)."""
     from matplotlib.colors import LinearSegmentedColormap
 
     df_work = df_fraude.copy()
@@ -7351,22 +7384,12 @@ def plot_heatmap_zscore_clusters(
         verbose=False,
     )
 
-    # Ancora deltas D*/delta_D* contra TransactionDT (remove drift temporal no heatmap)
-    cols_d_ancora: List[str] = []
-    if "TransactionDT" in df_work.columns:
-        dias_dt = df_work["TransactionDT"].astype("float64") / 86400.0
-        for col_d in mapa_cols["delta"]:
-            col_anc = f"{col_d}_ancora"
-            if col_anc not in df_work.columns and pd.api.types.is_numeric_dtype(df_work[col_d]):
-                df_work[col_anc] = df_work[col_d].astype("float64") - dias_dt
-            if col_anc in df_work.columns:
-                cols_d_ancora.append(col_anc)
-
+    # Sem ancoragem: deltas D*/delta_D* usados na escala original
     padrao_feats = (
         (["TransactionAmt"] if "TransactionAmt" in df_work.columns else [])
         + mapa_cols["nulos"]
         + mapa_cols["vel"]
-        + (cols_d_ancora if cols_d_ancora else mapa_cols["delta"])
+        + mapa_cols["delta"]
         + mapa_cols["extras"]
     )
     candidatas = features_continuas if features_continuas is not None else padrao_feats
@@ -9142,12 +9165,16 @@ def plot_gini_temporal(df_temp: pd.DataFrame, col_bloco: str = 'semana', rotulo_
 def obter_rotulos_clusters_fraude(
     df_master: pd.DataFrame, meta: Optional[Dict[str, Any]], mapa_arquetipos: Dict[int, str],
     caminho_cache: Optional[Union[str, Path]] = None, k: int = 10, n_neighbors: int = 40, min_dist: float = 0.0,
-    random_state: int = 42, forcar_recalculo: bool = False,
+    random_state: int = 42, forcar_recalculo: bool = False, train_ratio: float = 0.60,
 ) -> pd.DataFrame:
     """
-    Rótulos de cluster (K-Means K=10 no UMAP 10D) e arquétipo para 100% das fraudes do `df_master`,
-    reproduzindo EXATAMENTE a esteira do 03_Segmentacao (mesmo recorte, ordenação, pré-processamento,
-    UMAP e semente). O resultado é salvo em cache (`caminho_cache`) para não recalcular o UMAP.
+    Rótulos de cluster (K-Means K=10 no UMAP 10D) e arquétipo para as fraudes do `df_master`.
+
+    O pré-processamento, o UMAP e o K-Means são ajustados SOMENTE nas fraudes do Treino
+    (primeiros `train_ratio` cronológicos), reproduzindo EXATAMENTE a esteira do 03_Segmentacao
+    (mesmo recorte, ordenação, pré-processamento, UMAP e semente). As fraudes de Validação e OOT
+    são apenas projetadas (`aplicar_preparo_clusterizacao` -> `umap.transform` -> `kmeans.predict`),
+    sem participar do ajuste. O resultado é salvo em cache (`caminho_cache`) para não recalcular o UMAP.
     """
     if caminho_cache is not None and Path(caminho_cache).exists() and not forcar_recalculo:
         df_cl = pd.read_parquet(caminho_cache)
@@ -9155,15 +9182,29 @@ def obter_rotulos_clusters_fraude(
         return df_cl
 
     from sklearn.cluster import KMeans
-    print("[CLUSTERS] Cache não encontrado — reproduzindo a esteira do 03_Segmentacao (UMAP 10D + K-Means)...")
-    df_fraude = df_master[df_master['isFraud'] == 1].sort_values('TransactionDT').reset_index(drop=True)
-    X_tratado, _, _, _ = preparar_dados_clusterizacao(
+    print("[CLUSTERS] Cache não encontrado — reproduzindo a esteira do 03_Segmentacao (ajuste no Treino: UMAP 10D + K-Means)...")
+    df_treino_ref = recortar_treino_temporal(df_master, train_ratio=train_ratio)
+    df_fraude = df_treino_ref[df_treino_ref['isFraud'] == 1].sort_values('TransactionDT').reset_index(drop=True)
+    X_tratado, _, _, preprocessador = preparar_dados_clusterizacao(
         df_fraude, meta=meta, max_ohe_cardinalidade=15, aplicar_log1p_assimetricas=True,
-        limiar_skew_log=1.0, corrigir_drift_d=True)
-    X_umap_10d, _ = projetar_umap(X_tratado, n_components=10, n_neighbors=n_neighbors, min_dist=min_dist,
-                                  random_state=random_state)
-    rotulos = KMeans(n_clusters=k, init='k-means++', n_init=20, random_state=random_state).fit_predict(X_umap_10d)
-    df_cl = pd.DataFrame({'TransactionID': df_fraude['TransactionID'].values, 'cluster': rotulos.astype(int)})
+        limiar_skew_log=1.0)
+    X_umap_10d, modelo_umap = projetar_umap(X_tratado, n_components=10, n_neighbors=n_neighbors, min_dist=min_dist,
+                                            random_state=random_state)
+    kmeans = KMeans(n_clusters=k, init='k-means++', n_init=20, random_state=random_state).fit(X_umap_10d)
+    df_cl_treino = pd.DataFrame({'TransactionID': df_fraude['TransactionID'].values,
+                                 'cluster': kmeans.labels_.astype(int), 'base_cluster': 'Treino (ajuste)'})
+
+    # Fraudes fora do Treino (Validação + OOT): apenas projetadas no espaço ajustado
+    mask_fora = (df_master['isFraud'] == 1) & ~df_master['TransactionID'].isin(df_fraude['TransactionID'])
+    df_fora = df_master[mask_fora].sort_values('TransactionDT').reset_index(drop=True)
+    partes = [df_cl_treino]
+    if len(df_fora):
+        X_fora = aplicar_preparo_clusterizacao(df_fora, preprocessador)
+        rotulos_fora = kmeans.predict(modelo_umap.transform(X_fora))
+        partes.append(pd.DataFrame({'TransactionID': df_fora['TransactionID'].values,
+                                    'cluster': rotulos_fora.astype(int), 'base_cluster': 'Projetada (Val/OOT)'}))
+    print(f"[CLUSTERS] Ajuste em {len(df_fraude):,} fraudes do Treino | projeção em {len(df_fora):,} fraudes de Validação/OOT")
+    df_cl = pd.concat(partes, ignore_index=True)
     df_cl['arquetipo'] = df_cl['cluster'].map(mapa_arquetipos)
     if caminho_cache is not None:
         Path(caminho_cache).parent.mkdir(parents=True, exist_ok=True)
@@ -10488,6 +10529,8 @@ __all__ = [
     'extrair_metricas_avaliacao',
     'exportar_artefatos_modelo',
     'preparar_dados_clusterizacao',
+    'aplicar_preparo_clusterizacao',
+    'recortar_treino_temporal',
     'projetar_pca',
     'plot_pca_variancia_acumulada',
     'projetar_umap',
