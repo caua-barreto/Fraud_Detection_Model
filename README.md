@@ -11,7 +11,8 @@
 
 ## 📌 Sobre o Projeto
 
-Fraude é só **3,5%** das transações, mas cada fraude aprovada custa **100%** do valor, enquanto uma venda legítima rende **2%**. Este projeto constrói um sistema de decisão antifraude de ponta a ponta sobre as **590.540 transações** da competição [IEEE-CIS Fraud Detection](https://www.kaggle.com/c/ieee-fraud-detection) (Vesta Corporation):
+Fraude é só **3,5%** das transações, mas cada fraude aprovada custa **100%** do valor, enquanto uma venda legítima rende **2%**, ao mesmo tempo, a cada **3$ transacionado, 2$ são de tentativas de fraude**. Este projeto constrói um sistema de decisão antifraude de ponta a ponta sobre as **590.540 transações** da competição [IEEE-CIS Fraud Detection](https://www.kaggle.com/c/ieee-fraud-detection) (Vesta Corporation):
+
 
 - **Modelo:** LightGBM com **30 features** selecionadas por SHAP e **calibração isotônica** (score → probabilidade real);
 - **Decisão:** **threshold dinâmico por valor da transação**, otimizado em dólares (mais tolerante em micro-compras, mais rigoroso em tickets altos);
@@ -68,9 +69,9 @@ pip install -r requirements.txt                          # versões fixadas (amb
 
 Os dados brutos ficam em `data/raw/` (não versionados). Baixe-os da competição ou ative o download automático via KaggleHub (`--set paths.auto_download_kaggle=true`).
 
-**Opção 1 — Notebooks (análise com storytelling):** execute `notebooks/01` a `05`, em ordem.
+**Opção 1: Notebooks (análise com storytelling):** execute `notebooks/01` a `05`, em ordem.
 
-**Opção 2 — Pipeline reprodutível (somente Python):**
+**Opção 2: Pipeline reprodutível (somente Python):**
 
 ```bash
 python main.py                                  # prepare -> train -> segment -> evaluate -> predict
