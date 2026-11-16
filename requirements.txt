@@ -1,61 +1,52 @@
-# =========================================================
-# INTEGRAÇÃO E DADOS KAGGLE
-# =========================================================
-kagglehub>=0.2.0        
-pyarrow>=14.0.0         
+# ==============================================================================
+# Versões EXATAS (==) para reprodutibilidade determinística.
+# Fonte: ambiente em que os notebooks foram executados (Google Colab, Python 3.13),
+# registrado na saída do `pip install -r requirements.txt` do 01_EDA.ipynb.
+# Instalação:  pip install -r requirements.txt
+# ==============================================================================
 
-# =========================================================
-# MANIPULAÇÃO, ANÁLISE DE DADOS E MEMÓRIA
-# =========================================================
-pandas>=2.0.0
-numpy>=1.24.0
-scipy>=1.10.0           # Distâncias, dendrogramas e testes estatísticos
-statsmodels>=0.14.0     # Diagnóstico de VIF e modelos estatísticos
-polars>=0.19.0          # Alternativa ultra-rápida ao Pandas (útil para o volume massivo deste dataset)
+# ----------------------------------------------------------------- dados / Kaggle
+kagglehub==1.0.3
+pyarrow==23.0.1
+pandas==2.2.3
+numpy==2.4.6
+scipy==1.16.3
+statsmodels==0.15.0
+polars==1.35.2
 
-# =========================================================
-# VISUALIZAÇÃO DE DADOS E GEOPROCESSAMENTO
-# =========================================================
-matplotlib>=3.7.0       # Método do cotovelo, dispersão de clusters
-seaborn>=0.12.0
-plotly>=5.15.0          # Gráficos interativos 2D/3D e projeções
-geopandas>=1.0.0        # Manipulação de dados geoespaciais e shapefiles
-shapely>=2.0.0          # Geometrias espaciais (Point, Polygon)
-contextily>=1.6.0       # Mapas base e tiles geográficos
+# ------------------------------------------------------------ visualização / geo
+matplotlib==3.10.0
+seaborn==0.13.2
+plotly==5.24.1
+geopandas==1.2.0
+shapely==2.2.0
+contextily==1.7.1
 
-# =========================================================
-# MACHINE LEARNING, ENCODING E DESBALANCEAMENTO
-# =========================================================
-scikit-learn>=1.3.0     # KMeans, PCA, métricas ROC-AUC, pipelines
-category-encoders>=2.6.0 # Target Encoding, Weight of Evidence, CatBoost Encoding (para alta cardinalidade)
-imbalanced-learn>=0.11.0 # Técnicas de SMOTE, Tomek Links e Undersampling para os 3.5% de fraude
+# ------------------------------------------------------------ machine learning
+scikit-learn==1.6.1
+category-encoders==2.11.2
+imbalanced-learn==0.14.2
+xgboost==3.4.1
+lightgbm==4.6.0
+catboost==1.2.10
 
-# =========================================================
-# MODELOS DE CLASSIFICAÇÃO (GRADIENT BOOSTING)
-# =========================================================
-xgboost>=2.0.0          # XGBClassifier (Robusto para features numéricas e nulos)
-lightgbm>=4.0.0         # LGBMClassifier (Rápido, consome pouca RAM, lida bem com categóricas)
-catboost>=1.2.0         # CatBoostClassifier (Otimizado nativamente para as colunas card, emaildomain, etc)
+# ------------------------------------------- clusterização / redução de dimensão
+hdbscan==0.8.44
+umap-learn==0.5.12
 
-# =========================================================
-# CLUSTERIZAÇÃO E REDUÇÃO DE DIMENSIONALIDADE
-# =========================================================
-hdbscan>=0.8.30         # Clusterização baseada em densidade com densidade variável
-umap-learn>=0.5.5       # Redução de dimensionalidade não-linear (excelente para as variáveis anonimizadas)
+# ---------------------------------------------- tuning e explicabilidade
+optuna==5.0.0
+shap==0.54.1
 
-# =========================================================
-# OTIMIZAÇÃO DE HIPERPARÂMETROS E EXPLICABILIDADE
-# =========================================================
-optuna>=3.0.0           # Tuning bayesiano hiperparâmetros (LightGBM, XGBoost, CatBoost)
-shap>=0.42.0            # Feature importance e interpretabilidade (essencial para as variáveis V)
+# ------------------------------------------------------ utilitários / ambiente
+joblib==1.6.0
+pyyaml==6.0.3
+python-dotenv==1.2.4
+ipykernel==7.4.0
+nbformat==5.11.1
+tqdm==4.67.3
+tabulate==0.9.0
+reportlab==4.2.5       # relatório PDF (scripts/gerar_relatorio_pdf.py)
 
-# =========================================================
-# AMBIENTE DE DESENVOLVIMENTO E UTILITÁRIOS
-# =========================================================
-joblib>=1.3.0           # Serialização rápida do modelo treinado
-pyyaml>=6.0.0           
-python-dotenv>=1.0.0    
-ipykernel>=6.20.0       
-nbformat>=5.9.0         
-tqdm>=4.65.0            # Barra de progresso para loops e grids
-tabulate>=0.9.0
+# ------------------------------------------------------------ testes (tests/)
+pytest==8.3.5

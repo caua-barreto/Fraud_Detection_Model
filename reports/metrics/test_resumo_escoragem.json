@@ -1,0 +1,22 @@
+{
+  "modelo": "LGBM_Otimizado",
+  "n_features_modelo": 30,
+  "n_transacoes_test": 506691,
+  "prob_cal_media_val_pct": 3.0902,
+  "prob_cal_media_oot_pct": 2.9368,
+  "prob_cal_media_test_pct": 2.8283,
+  "taxa_bloqueio_val_pct": 14.0617,
+  "taxa_bloqueio_oot_pct": 14.2802,
+  "taxa_bloqueio_test_pct": 12.6213,
+  "n_bloqueios_test": 63951,
+  "gmv_total_test_usd": 68264232.91,
+  "gmv_retido_test_usd": 11526851.47,
+  "pct_gmv_retido_test": 16.8856,
+  "psi_score_val_vs_test": 0.0061,
+  "share_d9_d10_test_pct": 17.2665,
+  "features_psi_estavel": 30,
+  "features_psi_alerta": 0,
+  "features_psi_critico": 0,
+  "arquivo_kaggle": "data/submissions/submission_kaggle.csv",
+  "arquivo_binario": "data/submissions/predicoes_test_binarias.csv"
+}

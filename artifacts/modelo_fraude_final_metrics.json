@@ -1,0 +1,86 @@
+{
+  "nome_modelo": "LGBM_Otimizado",
+  "treinado_100pct_treino": true,
+  "threshold_dinamico_params": {
+    "tipo": "threshold_dinamico",
+    "formula": "bloquear se prob_calibrada >= t_min + (t_max - t_min) * exp(-k * TransactionAmt_USD)",
+    "t_min": 0.025791285392240508,
+    "t_max": 0.05132554550644277,
+    "k": 0.004921576093332922,
+    "lucro_oof_optuna": 234547.56871341844,
+    "threshold_fixo_referencia": 0.03408815351288434
+  },
+  "metricas_por_base": {
+    "Treino (Teste CV)": {
+      "independentes_threshold": {
+        "ROC-AUC": 0.8900474443685737,
+        "GINI": 0.7800948887371475,
+        "PR-AUC": 0.4649642586673525,
+        "KS": 0.6220438480311612
+      },
+      "regra_threshold_dinamico": {
+        "Precision": 0.1819650327757072,
+        "Recall": 0.741874162617899,
+        "F1-Score": 0.28790415691036714,
+        "Aprovacao_Legitimas": 0.8721216730286363,
+        "Aceitacao_Geral": 0.850546597293059,
+        "Qtd_VP": 9007,
+        "Qtd_FP": 46673,
+        "Qtd_FN": 2981,
+        "Qtd_VN": 295663
+      },
+      "financeiro_usd": {
+        "Receita_VN_USD": 761080.3657708368,
+        "Perda_FP_USD": 157253.79998195445,
+        "Chargeback_FN_USD": 369278.9970754639,
+        "Lucro_Liquido_USD": 234547.56871341844,
+        "Lucro_Sem_Modelo_USD": -759456.5581291536,
+        "Lucro_por_Transacao_USD": 0.6400309886526524,
+        "Margem_sobre_Volume": 0.00471161922181056
+      }
+    },
+    "Validação": {
+      "independentes_threshold": {
+        "ROC-AUC": 0.9047238580890724,
+        "GINI": 0.8094477161781448,
+        "PR-AUC": 0.5098939178106731,
+        "KS": 0.6481635259221228
+      },
+      "regra_threshold_dinamico": {
+        "Precision": 0.20827312138728324,
+        "Recall": 0.7501626545217958,
+        "F1-Score": 0.3260285593100523,
+        "Aprovacao_Legitimas": 0.8841467175343841,
+        "Aceitacao_Geral": 0.8593829376502862,
+        "Qtd_VP": 3459,
+        "Qtd_FP": 13149,
+        "Qtd_FN": 1152,
+        "Qtd_VN": 100348
+      },
+      "financeiro_usd": {
+        "Receita_VN_USD": 253466.93268315928,
+        "Perda_FP_USD": 48631.04848035093,
+        "Chargeback_FN_USD": 176930.2808311879,
+        "Lucro_Liquido_USD": 27905.60337162044,
+        "Lucro_Sem_Modelo_USD": -494021.89811196626,
+        "Lucro_por_Transacao_USD": 0.2362719152946493,
+        "Margem_sobre_Volume": 0.0017549569295773602
+      }
+    }
+  },
+  "gap_validacao_vs_cv": {
+    "Taxa Fraude": 0.005207098587733258,
+    "ROC-AUC": 0.01467641372049866,
+    "GINI": 0.02935282744099732,
+    "PR-AUC": 0.04492965914332053,
+    "KS": 0.02611967789096159,
+    "Precision": 0.026308088611576047,
+    "Recall": 0.0082884919038968,
+    "F1-Score": 0.038124402399685176,
+    "Aprovação": 0.012025044505747817,
+    "Aceitação Geral": 0.008836340357227135,
+    "Qtd_VN": -195315.0,
+    "Lucro por Transação": -0.4037590733580031,
+    "Margem s/ Volume": -0.0029566622922331995
+  }
+}

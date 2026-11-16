@@ -1,78 +1,122 @@
-# 💳 Previsão e Análise de Risco de Crédito: IEEE-CIS Fraud Detection
+# 💳 Detecção de Fraude em Pagamentos Online — IEEE-CIS
 
-[![Kaggle](https://img.shields.io/badge/Kaggle-Competition-blue?style=for-the-badge&logo=kaggle)](https://www.kaggle.com/c/ieee-fraud-detection)
+![Kaggle](https://img.shields.io/badge/Kaggle-IEEE--CIS%20Fraud%20Detection-blue?style=for-the-badge&logo=kaggle)
+![LightGBM](https://img.shields.io/badge/Modelo-LightGBM%20Calibrado-0B2545?style=for-the-badge)
+![Python](https://img.shields.io/badge/Python-3.13-13579B?style=for-the-badge&logo=python&logoColor=white)
+![MLOps](https://img.shields.io/badge/Pipeline-Reprodut%C3%ADvel-0096C7?style=for-the-badge)
 
-Este projeto tem como objetivo desenvolver um sistema completo de ponta a ponta para a detecção de fraudes em transações de crédito, utilizando a base de dados da competição **IEEE-CIS Fraud Detection** do Kaggle.
-
----
-
-### 📌 Status do Projeto (`12/11/2026`)
-Pipeline principal estruturado de ponta a ponta (`01_EDA.ipynb`, `02_Modelagem.ipynb`, `04_Clusters.ipynb` e módulo central `utils.py`): **EDA e Master Table** concluídas, **Modelagem** com divisão temporal 60/20/20 e calibração/threshold financeiro ajustados, e **Clusterização** de perfis de fraude (`K-Means K=10`) mapeada em arquétipos de ataque. Próxima etapa focada em refinamentos analíticos e avaliação aprofundada no conjunto *Out-of-Time* (`df_oot`).
+> 📄 **[Relatório completo de análise de negócio (PDF)](Relatorio_Analise_Fraude.pdf)**: storytelling, perfis de fraude, decisões e recomendações.
 
 ---
 
-## 📊 O Dataset
+## 📌 Sobre o Projeto
 
-A base de dados utilizada é fornecida pela Vesta Corporation em parceria com a IEEE Computational Intelligence Society. Ela contém centenas de features anônimas e atributos categóricos simulando um ambiente real de e-commerce e pagamentos online. O desafio principal é lidar com um cenário extremo de **classe minoritária** (fraude representa cerca de 3,5% dos dados) e variáveis altamente dimensionais e correlacionadas.
+Fraude é só **3,5%** das transações, mas cada fraude aprovada custa **100%** do valor, enquanto uma venda legítima rende **2%**. Este projeto constrói um sistema de decisão antifraude de ponta a ponta sobre as **590.540 transações** da competição [IEEE-CIS Fraud Detection](https://www.kaggle.com/c/ieee-fraud-detection) (Vesta Corporation):
 
-🔗 **Link Oficial da Competição:** [IEEE-CIS Fraud Detection no Kaggle](https://www.kaggle.com/c/ieee-fraud-detection)
-
----
-
-## 🗺️ Roadmap e Arquitetura do Projeto
-
-O desenvolvimento deste repositório segue um fluxo modular dividido em notebooks especializados e apoiado pelas funções de `utils.py`:
-
-### 1. `notebooks/01_EDA.ipynb` (Análise Exploratória e Engenharia de Features)
-* **Inspeção e Unificação:** Análise dos blocos transacionais e de identidade (`transaction` + `identity`), tratamento de nulos estruturais e otimização de memória (`safe_downcast`).
-* **Engenharia de Atributos:** Criação de variáveis temporais, métricas financeiras (como `np.log1p` em caudas longas e razões por cartão), cruzes de domínio de e-mail, contagens de nulos e *frequency encoding*.
-* **Funil de Seleção Multivariada:** Filtragem via **Information Value (IV)**, análise de correlação de pares e diagnóstico de **VIF**, consolidando a saída em `data/processed/df_master.parquet` e `features_metadata.json`.
-
-### 2. `notebooks/02_Modelagem.ipynb` (Treinamento, Otimização e Calibração)
-* **Split Temporal Estrito (60% / 20% / 20%):** Particionamento cronológico via `TransactionDT` em **Treino (`train_df`, 60%)**, **Validação (`df_validacao`, 20%)** e **Out-of-Time (`df_oot`, 20%)**, mantendo o OOT cego durante tuning, seleção de threshold e poda SHAP.
-* **Cross-Validation sem Leakage:** Validação cruzada agrupada por mês (`GroupKFold`) exclusivamente no Treino, com agregações e encodings ajustados pós-split.
-* **Algoritmos e Tuning:** Baselines (`LogisticRegression`, `LightGBM`, `XGBoost`, `CatBoost`), otimização Bayesiana com **Optuna**, checagem de correlação para ensemble e poda dimensional via **SHAP**.
-* **Calibração e Threshold Financeiro:** Calibração isotônica em predições *Out-of-Fold* (OOF) e otimização do ponto de corte baseada em retorno líquido em US$ reais (`np.expm1` em `TransactionAmt`).
-
-### 3. `notebooks/03_Av.ipynb` (Avaliação Avançada no OOT, Drift e Hipóteses)
-* **Prova Final no OOT:** Avaliação estatística e operacional no bloco futuro (`df_oot`), monitorando **ROC-AUC, PR-AUC, KS, estabilidade temporal e Drift**.
-* **Cruzamento com Clusters:** Análise do desempenho do modelo e validação de hipóteses de negócio segmentadas por perfil de ataque.
-
-### 4. `notebooks/04_Clusters.ipynb` (Clusterização e *Modus Operandi* das Fraudes)
-* **Escopo Livre de OOT:** Filtragem das transações fraudulentas em `Treino + Validação` mantendo o OOT isolado.
-* **Redução Dimensional e Agrupamento:** Comparação entre **PCA** e **UMAP** (10D e 2D) e segmentação com **K-Means (`K=10`)**.
-* **Mapeamento de Quadrilhas:** Perfilamento numérico via *heatmap* de Z-Score e consolidação de quatro macrogrupos estratégicos (Botnets/Card Testing, *Hit and Run* no Varejo, *Account Takeover* Premium e Fraude Clássica/Limbo Operacional).
+- **Modelo:** LightGBM com **30 features** selecionadas por SHAP e **calibração isotônica** (score → probabilidade real);
+- **Decisão:** **threshold dinâmico por valor da transação**, otimizado em dólares (mais tolerante em micro-compras, mais rigoroso em tickets altos);
+- **Segmentação:** 4 **arquétipos de fraude** (UMAP + K-Means) para entender quem ataca e onde o modelo falha;
+- **Validação honesta:** split temporal **60/20/20**, com os 20% mais recentes (**Out-of-Time**) isolados até a avaliação final.
 
 ---
 
-## 🛠️ Mudanças Realizadas (Pré-Commit)
+## 🏆 Principais Resultados (Out-of-Time: período futuro nunca visto)
 
-* **Consolidação da EDA (`notebooks/01_EDA.ipynb`):** Integração da etapa de engenharia de atributos diretamente na EDA (remoção de `notebooks/02_Feature_Engineering.ipynb`), cálculo de IV, remoção por correlação/VIF e exportação da `df_master.parquet`.
-* **Implementação de `notebooks/02_Modelagem.ipynb`:**
-  * Reestruturação completa para o split cronológico em 3 blocos (**60% Treino / 20% Validação / 20% OOT**), garantindo que o OOT não participe da busca de hiperparâmetros, comparação de modelos ou poda SHAP.
-  * Ajuste da tabela de métricas (`Treino`, `Teste` no CV e `Validação` isolada) e verificação de correlação de Pearson/Spearman entre `LightGBM_Opt` e `XGBoost_Opt`.
-  * Correção na Seção 6.0 (Calibração Isotônica e Threshold Financeiro) para reconverter `TransactionAmt` da escala `log1p` para dólares reais (`np.expm1`) e alinhar corretamente a avaliação com `df_validacao` (`X_test`/`y_test`), preservando o OOT cego até a Seção 8.0.
-* **Implementação de `notebooks/04_Clusters.ipynb`:**
-  * Estruturação da esteira de redução de dimensionalidade (`PCA` vs `UMAP`) e agrupamento (`K-Means K=10`).
-  * Organização das células respeitando o *storytelling* analítico (no máximo um gráfico ou tabela por célula) e ajuste do código final com `plot_heatmap_zscore_clusters`.
-* **Expansão de `utils.py` e `requirements.txt`:** Adição e refatoração das funções de preparação sem leakage (`preparar_dados_modelagem`), avaliação (`avaliar_classificador`, `avaliar_classificacao_oot`), funções objetivo do Optuna, poda SHAP, exportação de artefatos e gráficos/métricas de clusterização; criação do placeholder `notebooks/03_Av.ipynb`.
+| Indicador | Sem modelo | **Com o modelo** |
+| :--- | :---: | :---: |
+| Resultado financeiro | −US$ 297.264 | **+US$ 35.861** |
+| Fraudes bloqueadas (Recall) | 0% | **68,0%** |
+| Clientes legítimos aprovados | 100% | **87,6%** |
+| GINI / KS | — | **0,747 / 0,577** |
+
+- **+US$ 333 mil** de diferença em ~6 semanas e **US$ 441 mil** em fraudes evitadas (72% do valor fraudado);
+- os **10% de maior score concentram 61% das fraudes** (lift de 6,1x), sem inversões na escada de risco;
+- população estável no futuro: **PSI do score = 0,003**, 29 de 30 features estáveis e todas as semanas lucrativas.
+
+<p align="center"><img src="reports/figures/04_02_roc_pr_in_time_vs_oot.png" width="900" alt="Curvas ROC e Precision-Recall In-Time vs OOT"></p>
+
+**A regra de decisão:** o corte dinâmico lucrou mais que o corte fixo ótimo e que o clássico 0,50 na Validação, aprovando mais clientes legítimos.
+
+<p align="center"><img src="reports/figures/02_09_threshold_dinamico_lgbm_otimizado.png" width="700" alt="Threshold dinâmico por valor da transação"></p>
+
+**Onde o dinheiro escapa:** o modelo barra 88% da *Botnet*, mas só 47% do *Cartão Clonado*, que responde por 86% do chargeback vazado no OOT.
+
+<p align="center"><img src="reports/figures/04_13_recall_vazamento_grupos.png" width="900" alt="Recall e prejuízo vazado por arquétipo de fraude"></p>
 
 ---
 
-## ✅ Tarefas a Fazer (Próximos Passos)
+## ⚖️ Pontos Fortes e Fracos do Modelo
 
-1. **EDA (`notebooks/01_EDA.ipynb`):**
-   - [ ] Adicionar comentários interpretativos ao longo das análises e decisões de saneamento.
-   - [ ] Investigar e documentar possíveis incoerências nos dados (ex.: anomalias de preenchimento, valores extremos e consistência temporal).
-   - [ ] Renomear as colunas importantes (especialmente variáveis anonimizadas dos blocos `C`, `D`, `M`, `V` e features derivadas) para facilitar a interpretabilidade de negócio.
-2. **Modelagem (`notebooks/02_Modelagem.ipynb`):**
-   - [ ] Finalizar a execução completa da modelagem após os ajustes finais do pipeline.
-   - [ ] Concluir e validar a **Calibração Isotônica** e a curva de threshold financeiro em US$ reais.
-   - [ ] Adicionar comentários explicativos detalhando trade-offs, escolha do modelo campeão e regras de negócio.
-3. **Clusterização (`notebooks/04_Clusters.ipynb`):**
-   - [ ] Justificar formalmente por que **não utilizar algoritmos baseados em densidade** (como DBSCAN/HDBSCAN) frente à geometria, densidade heterogênea e dimensionalidade das features de fraude.
-   - [ ] Adicionar mais comentários interpretativos conectando os achados estatísticos dos clusters às ações antifraude.
-4. **Avaliação no OOT (`notebooks/03_Avaliation.ipynb` / Seção OOT):**
-   - [ ] Executar a avaliação final cega no conjunto **Out-of-Time (`df_oot`)**.
-   - [ ] Analisar **estabilidade temporal, *data/concept drift*, KS, PSI** e evolução mensal das métricas.
-   - [ ] Analisar o desempenho e a taxa de captura do modelo **sob a ótica dos clusters** identificados e **testar hipóteses** de negócio/risco.
+| ✅ Pontos fortes | ⚠️ Pontos fracos |
+| :--- | :--- |
+| Lucrativo em período futuro: reverte −US$ 297 mil em +US$ 35,9 mil | **Cartão Clonado:** Recall cai de 60,5% para **46,7%** no OOT e concentra 86% do vazamento |
+| Decisão orientada a custo (+2% / −100%), não a métricas abstratas | Perda moderada de discriminação no futuro (GINI −4,9%, Recall −7 p.p.) |
+| Forte contra automação: Botnet, Roubo de Contas e Ataque Inteligente com Recall de 77–88% | Subestima a fraude fora do treino (probabilidade calibrada −15% no OOT) |
+| Enxuto e estável: 30 features, PSI baixo, mesmos motores de decisão In-Time vs. OOT (Spearman SHAP = 0,93) | Parte dos sinais fortes é anonimizada (ex.: `V70`), com pouca interpretação de negócio |
+| Hipóteses alternativas testadas e descartadas com evidência (threshold por grupamento) | O `LGBM_Max` (125 features) lucrou ~US$ 6,3 mil a mais na Validação; a parcimônia foi priorizada |
+
+---
+
+## 🚀 Como Executar
+
+```bash
+git clone https://github.com/caua-barreto/Fraud_Detection_Model.git
+cd Fraud_Detection_Model
+python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
+pip install -r requirements.txt                          # versões fixadas (ambiente dos notebooks)
+```
+
+Os dados brutos ficam em `data/raw/` (não versionados). Baixe-os da competição ou ative o download automático via KaggleHub (`--set paths.auto_download_kaggle=true`).
+
+**Opção 1 — Notebooks (análise com storytelling):** execute `notebooks/01` a `05`, em ordem.
+
+**Opção 2 — Pipeline reprodutível (somente Python):**
+
+```bash
+python main.py                                  # prepare -> train -> segment -> evaluate -> predict
+python main.py --steps train evaluate           # apenas algumas etapas
+python main.py --experiment xgb_fixo --set model.estimator=xgboost --set decision_policy.mode=fixed
+python main.py --overwrite-default              # grava nos caminhos usados pelos notebooks
+python -m pytest tests -q                       # testes de paridade e sanidade
+```
+
+- Todos os parâmetros (split, features, Optuna, calibração, regra financeira, segmentação) estão em **`configs.yaml`** e podem ser sobrescritos com `--set`;
+- cada experimento é salvo isolado em `experiments/<nome>/`, com `configs_resolvido.yaml` e `run_manifest.json` (commit git, versões e status), sem alterar os arquivos dos notebooks;
+- as figuras são exportadas automaticamente para `reports/figures/`, e o relatório PDF é regerado com `python scripts/gerar_relatorio_pdf.py`.
+
+---
+
+## 📁 Estrutura do Repositório
+
+```
+Fraud_Detection_Model/
+├── Relatorio_Analise_Fraude.pdf   # relatório de negócio completo
+├── main.py                        # orquestrador CLI do pipeline
+├── configs.yaml                   # configuração única dos experimentos
+├── requirements.txt               # dependências com versões exatas
+├── notebooks/                     # 01_EDA · 02_Modelagem · 03_Segmentacao · 04_Avaliacao · 05_Submissao
+├── src/                           # código modular (importado pelos notebooks e scripts)
+│   ├── data/                      #   carga, split temporal, caudas longas
+│   ├── features/                  #   engenharia (treino = inferência) e seleção (IV, correlação, SHAP)
+│   ├── models/                    #   treino/Optuna, calibração, regra de decisão, artefatos
+│   ├── evaluation/                #   métricas, drift (PSI/KS) e SHAP
+│   ├── segmentation/              #   arquétipos de fraude e threshold por grupamento
+│   └── visualization/             #   tema azul e gráficos (exportação automática)
+├── scripts/                       # etapas do pipeline (01_prepare_data ... 05_segment_fraud) + relatório PDF
+├── tests/                         # paridade de features treino x test, config, figuras
+├── artifacts/                     # modelo .joblib, metadados, métricas e monitoramento OOT
+├── reports/                       # figures/ (gráficos) e metrics/ (CSVs e JSONs)
+└── data/                          # raw/ e processed/ (não versionados)
+```
+
+| Notebook | Pergunta que responde |
+| :--- | :--- |
+| `01_EDA` | Quando, onde e como a fraude acontece? Quais features construir e manter? |
+| `02_Modelagem` | Qual modelo, quais features e qual regra de corte maximizam o lucro? |
+| `03_Segmentacao` | Quem são os fraudadores? Um corte por grupo de clientes ajudaria? |
+| `04_Avaliacao` | O modelo se sustenta no futuro? Onde ele falha? O que mudou nos dados? |
+| `05_Submissao` | A escoragem da base cega do Kaggle é estável e consistente? |
+
+---
+
+*Desenvolvido por **Cauã de Freitas Barreto** — Junior Data Scientist · [GitHub](https://github.com/caua-barreto) · [LinkedIn](https://www.linkedin.com/in/caua-fbarreto-)*

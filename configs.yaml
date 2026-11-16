@@ -1,0 +1,127 @@
+# ==============================================================================
+# configs.yaml — Configuração ÚNICA do pipeline reprodutível (main.py / scripts/)
+# ------------------------------------------------------------------------------
+# - Lido SOMENTE por main.py e scripts/. Os notebooks NÃO leem este arquivo: as
+#   análises e o storytelling dos notebooks usam os padrões das funções em src/.
+# - Os valores padrão abaixo reproduzem as escolhas dos notebooks 01–05.
+# - Qualquer chave pode ser sobrescrita na linha de comando:
+#     python main.py --set model.tuning.n_trials=30 --set decision_policy.mode=fixed
+# ==============================================================================
+
+experiment:
+  name: "lgbm_dinamico_prod"
+  random_state: 42
+  # false -> grava tudo em experiments/<name>/ (não toca nos arquivos usados pelos notebooks)
+  # true  -> grava nos caminhos padrão (data/processed, artifacts, reports, data/submissions)
+  overwrite_default_artifacts: false
+
+paths:
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  artifacts_dir: "artifacts"
+  reports_dir: "reports"                # figuras em <reports_dir>/figures (plano, sem subpastas)
+  submissions_dir: "data/submissions"
+  experiments_dir: "experiments"
+  kaggle_competition: "ieee-fraud-detection"
+  auto_download_kaggle: false           # true para baixar automaticamente se faltar raw
+
+data:
+  train_ratio: 0.60
+  val_ratio: 0.20                       # OOT = restante (0.20)
+  downcast: true
+  drop_missing_threshold: 0.90          # documental: bloco id_07/08/21–27 (>90% nulos) descartado na FE
+
+features:
+  apply_fe: true                        # false -> usa df_master.parquet existente (pula o 01_prepare_data)
+  log1p_skew_threshold: 1.0
+  log1p_min_unique: 10
+  iv_bins: 10
+  iv_min: 0.02
+  corr_max: 0.75                        # 01_EDA usa |r| > 0.75 (diagnóstico com 0.70)
+  corr_null_tolerance: 0.20             # só poda a de menor IV se a de maior IV não tiver >20 p.p. a mais de nulos
+  vif_max: 10.0                         # diagnóstico (relatório CSV); null para pular e acelerar
+  vif_sample_size: 20000
+  linear_baseline_top_n: 50
+  linear_baseline_max_null: 0.30
+
+model:
+  estimator: "lightgbm"                 # lightgbm | xgboost | catboost
+  cv_splits: 3                          # GroupKFold por bloco mensal
+  baseline_params: {}                   # sobrescreve os hiperparâmetros do modelo base (ranking SHAP)
+  feature_selection:
+    mode: "shap_prune"                  # all | shap_prune | custom_list
+    select: "otimizado"                 # shap_prune: otimizado (menor N dentro da tolerância) | max (maior GINI)
+    gini_tolerance: 0.005               # perda máxima tolerada de GINI ao podar
+    prune_step: 5
+    min_features: 10
+    shap_sample_size: 15000
+    shap_random_state: 10
+    custom_list: []                     # usado quando mode: custom_list
+  tuning:
+    run_optuna: true
+    n_trials: 15
+    optuna_seed: 44                     # 02_Modelagem: SEED_OPTUNA (42) + k, com k=2 para o LGBM_Otimizado
+    params_override:                    # usado quando run_optuna: false — hiperparâmetros do artefato exportado
+      n_estimators: 241                 # (LGBM_Otimizado, 30 features — artifacts/modelo_fraude_final_metadata.json)
+      learning_rate: 0.06255402117794387
+      num_leaves: 45
+      max_depth: 10
+      subsample: 0.9734181082636478
+      colsample_bytree: 0.681912488657084
+      reg_alpha: 0.1353732328250471
+      reg_lambda: 2.1417811919267025
+
+calibration:
+  method: "isotonic"                    # isotonic | sigmoid
+  oof_splits: 4
+
+decision_policy:
+  mdr_rate: 0.02                        # +2% receita sobre VN, -2% custo de oportunidade FP
+  fraud_loss_rate: 1.00                 # -100% chargeback sobre FN
+  mode: "dynamic_exp"                   # dynamic_exp | fixed
+  fixed_t_max: 0.50                     # teto da busca exata do corte fixo
+  optuna_trials_threshold: 300
+  optuna_seed: 42
+  bounds:                               # espaço de busca do 02_Modelagem (t_min sempre < t_max - 0.01)
+    t_max: [0.05, 0.35]
+    t_min: [0.005, null]                # null = até t_max - 0.01
+    k: [0.001, 0.05]
+
+evaluation:
+  oof_train_scoring: true
+  shap_sample_size: 20000
+  block_days: 7                         # janela semanal
+  min_fraudes_bloco: 30
+  min_transacoes_bloco: 1000
+  psi_bins: 10
+  psi_thresholds:                       # rótulos Estável/Alerta/Crítico seguem 0.10 / 0.25 (padrão das funções)
+    alert: 0.10
+    critical: 0.25
+  gini_drop_tolerance: 0.10
+  n_decis: 10
+  save_figures: false                   # true -> gera os gráficos do 04 em <reports_dir>/figures
+
+segmentation:
+  enabled: true
+  k: 12
+  n_neighbors: 40
+  min_dist: 0.0
+  force_recompute: true                 # o script sempre reajusta (o 04 lê o cache gerado)
+  cluster_map:                          # MAPA_CLUSTER_ARQUETIPO do 03_Segmentacao (Seção 6.0)
+    1: "1. Cartão Clonado"
+    5: "1. Cartão Clonado"
+    0: "2. Botnet"
+    2: "2. Botnet"
+    6: "2. Botnet"
+    7: "2. Botnet"
+    9: "2. Botnet"
+    10: "2. Botnet"
+    3: "3. Roubo de Contas (ATO)"
+    8: "3. Roubo de Contas (ATO)"
+    11: "3. Roubo de Contas (ATO)"
+    4: "4. Ataque Inteligente"
+
+inference:
+  save_binary_audit: true
+  kaggle_float_precision: 8
+  force_download: false

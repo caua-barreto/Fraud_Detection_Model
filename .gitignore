@@ -1,0 +1,34 @@
+# ==============================================================================
+# Dados pesados (não versionados) — baixe via KaggleHub ou gere com `python main.py`
+# ==============================================================================
+# Bases brutas da competição (train/test/sample_submission)
+data/raw/*
+!data/raw/.gitkeep
+
+# Master table e demais parquets/CSVs grandes gerados pelo pipeline
+data/processed/*.parquet
+data/processed/*.csv
+!data/processed/fraude_clusters_treino_k*.parquet
+
+# Submissões Kaggle e trilhas de auditoria (CSVs de ~500k linhas)
+data/submissions/
+
+# CSVs grandes em qualquer lugar de data/
+data/**/*.csv
+
+# Saídas de experimentos do main.py (isolados por experiment.name)
+experiments/
+
+# ==============================================================================
+# Python / ambiente
+# ==============================================================================
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+.venv/
+venv/
+.env
+
+# Sistema
+.DS_Store

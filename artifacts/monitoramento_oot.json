@@ -1,0 +1,614 @@
+{
+  "timestamp_avaliacao": "2026-11-16T01:00:27",
+  "modelo": "LGBM_Otimizado",
+  "hash_artefato": "ed595960",
+  "total_features": 30,
+  "regra_decisao": {
+    "tipo": "threshold_dinamico",
+    "formula": "bloquear se prob_calibrada >= t_min + (t_max - t_min) * exp(-k * TransactionAmt_USD)",
+    "t_min": 0.0257912854,
+    "t_max": 0.0513255455,
+    "k": 0.0049215761,
+    "lucro_oof_optuna": 234547.5687134184,
+    "threshold_fixo_referencia": 0.0340881535
+  },
+  "treino_escorado_oof": true,
+  "metricas_por_base": {
+    "Treino (OOF)": {
+      "Transações": 354324.0,
+      "Taxa Fraude": 0.0338334406,
+      "ROC-AUC": 0.8890100763,
+      "GINI": 0.7780201526,
+      "PR-AUC": 0.419019267,
+      "KS": 0.6181133198,
+      "Precision": 0.1617636494,
+      "Recall": 0.751334668,
+      "F1-Score": 0.2662115032,
+      "Aprovação": 0.8636631847,
+      "Aceitação Geral": 0.8428556914,
+      "Qtd_VP": 9007.0,
+      "Qtd_FP": 46673.0,
+      "Qtd_FN": 2981.0,
+      "Qtd_VN": 295663.0,
+      "Receita VN": 761080.3657708368,
+      "Perda FP": 157253.7999819544,
+      "Chargeback FN": 369278.9970754639,
+      "Lucro Líquido": 234547.5687134184,
+      "Lucro Sem Modelo": -759456.5581291536,
+      "Lucro por Transação": 0.6619578937,
+      "Margem s/ Volume": 0.0049280394
+    },
+    "Validação": {
+      "Transações": 118108.0,
+      "Taxa Fraude": 0.0390405392,
+      "ROC-AUC": 0.9047238581,
+      "GINI": 0.8094477162,
+      "PR-AUC": 0.5098939178,
+      "KS": 0.6481635259,
+      "Precision": 0.2082731214,
+      "Recall": 0.7501626545,
+      "F1-Score": 0.3260285593,
+      "Aprovação": 0.8841467175,
+      "Aceitação Geral": 0.8593829377,
+      "Qtd_VP": 3459.0,
+      "Qtd_FP": 13149.0,
+      "Qtd_FN": 1152.0,
+      "Qtd_VN": 100348.0,
+      "Receita VN": 253466.9326831593,
+      "Perda FP": 48631.0484803509,
+      "Chargeback FN": 176930.2808311879,
+      "Lucro Líquido": 27905.6033716204,
+      "Lucro Sem Modelo": -494021.8981119663,
+      "Lucro por Transação": 0.2362719153,
+      "Margem s/ Volume": 0.0017549569
+    },
+    "In-Time": {
+      "Transações": 472432.0,
+      "Taxa Fraude": 0.0351352152,
+      "ROC-AUC": 0.8929668354,
+      "GINI": 0.7859336708,
+      "PR-AUC": 0.4401065841,
+      "KS": 0.6246464231,
+      "Precision": 0.1724490925,
+      "Recall": 0.7510090969,
+      "F1-Score": 0.2804909604,
+      "Aprovação": 0.868763341,
+      "Aceitação Geral": 0.846987503,
+      "Qtd_VP": 12466.0,
+      "Qtd_FP": 59822.0,
+      "Qtd_FN": 4133.0,
+      "Qtd_VN": 396011.0,
+      "Receita VN": 1014547.298453996,
+      "Perda FP": 205884.8484623054,
+      "Chargeback FN": 546209.2779066518,
+      "Lucro Líquido": 262453.1720850387,
+      "Lucro Sem Modelo": -1253478.4562411197,
+      "Lucro por Transação": 0.5555363991,
+      "Margem s/ Volume": 0.0041334126
+    },
+    "OOT": {
+      "Transações": 118108.0,
+      "Taxa Fraude": 0.0344091848,
+      "ROC-AUC": 0.8735896278,
+      "GINI": 0.7471792556,
+      "PR-AUC": 0.4204238648,
+      "KS": 0.5772933647,
+      "Precision": 0.1637614135,
+      "Recall": 0.6796259843,
+      "F1-Score": 0.263927377,
+      "Aprovação": 0.8763284346,
+      "Aceitação Geral": 0.8571984963,
+      "Qtd_VP": 2762.0,
+      "Qtd_FP": 14104.0,
+      "Qtd_FN": 1302.0,
+      "Qtd_VN": 99940.0,
+      "Receita VN": 258596.6595504232,
+      "Perda FP": 54073.304881678,
+      "Chargeback FN": 168661.8834451544,
+      "Lucro Líquido": 35861.4712235908,
+      "Lucro Sem Modelo": -297264.3960792235,
+      "Lucro por Transação": 0.3036328718,
+      "Margem s/ Volume": 0.002207752
+    }
+  },
+  "delta_oot_vs_in_time": {
+    "Transações": -354324.0,
+    "Taxa Fraude": -0.0007260304,
+    "ROC-AUC": -0.0193772076,
+    "GINI": -0.0387544153,
+    "PR-AUC": -0.0196827193,
+    "KS": -0.0473530584,
+    "Precision": -0.008687679,
+    "Recall": -0.0713831127,
+    "F1-Score": -0.0165635835,
+    "Aprovação": 0.0075650937,
+    "Aceitação Geral": 0.0102109933,
+    "Qtd_VP": -9704.0,
+    "Qtd_FP": -45718.0,
+    "Qtd_FN": -2831.0,
+    "Qtd_VN": -296071.0,
+    "Receita VN": -755950.6389035728,
+    "Perda FP": -151811.5435806274,
+    "Chargeback FN": -377547.3944614974,
+    "Lucro Líquido": -226591.7008614479,
+    "Lucro Sem Modelo": 956214.060161896,
+    "Lucro por Transação": -0.2519035273,
+    "Margem s/ Volume": -0.0019256605
+  },
+  "separacao": {
+    "ks_in_time": 0.6246464231,
+    "ks_oot": 0.5772933647,
+    "monotonico_oot": true,
+    "lift_decil10_oot": 6.1022588712,
+    "captura_decil10_oot_pct": 61.0236220472
+  },
+  "drift": {
+    "taxa_fraude_media": {
+      "In-Time": 3.514785829,
+      "OOT": 3.4361449036
+    },
+    "qui2_in_time_vs_oot": {
+      "chi2": 1.4536138618,
+      "p_valor": 0.2279489619,
+      "gl": 1,
+      "freq_esperada_min": 4132.6,
+      "cramers_v": 0.0015689166,
+      "efeito": "desprezível"
+    },
+    "psi_score": 0.0028354829,
+    "status_psi_score": "Estável",
+    "ks_shift_score": 0.0231144376,
+    "psi_features": {
+      "match_cont_F": 0.1272041512,
+      "delta_D8": 0.0625118661,
+      "delta_D15": 0.0476524522,
+      "delta_D10": 0.025404603,
+      "delta_D1": 0.0240136077,
+      "ProductCD": 0.0202529373,
+      "V156": 0.0172435339,
+      "vel_C8": 0.0165745646,
+      "delta_D2": 0.0155933169,
+      "tempo_hora": 0.0145458871,
+      "V258": 0.0127295116,
+      "vel_C2": 0.0117369035,
+      "card5": 0.0084235715,
+      "valor_centavos": 0.0047726593,
+      "P_emaildomain_freq": 0.0044637038,
+      "P_emaildomain": 0.0044116484,
+      "match_M4_cat": 0.0039922268,
+      "TransactionAmt": 0.0039757776,
+      "cartao_tipo_cat": 0.0038874336,
+      "dist1": 0.0034133224,
+      "addr1_freq": 0.0033876079,
+      "delta_D5": 0.0033471061,
+      "card2_freq": 0.0032333535,
+      "card1_freq": 0.0025859863,
+      "vel_C5": 0.0025666157,
+      "V317": 0.0022562912,
+      "V164": 0.0022356495,
+      "V70": 0.0003362785,
+      "match_M6_bin": 0.0,
+      "match_M3_bin": 0.0
+    },
+    "top_risco_drift": [
+      {
+        "Feature": "delta_D15",
+        "PSI": 0.0476524522,
+        "Risco_Drift": 0.2590748739
+      },
+      {
+        "Feature": "match_cont_F",
+        "PSI": 0.1272041512,
+        "Risco_Drift": 0.2257159692
+      },
+      {
+        "Feature": "delta_D2",
+        "PSI": 0.0155933169,
+        "Risco_Drift": 0.0989253072
+      },
+      {
+        "Feature": "delta_D8",
+        "PSI": 0.0625118661,
+        "Risco_Drift": 0.0967531362
+      },
+      {
+        "Feature": "delta_D1",
+        "PSI": 0.0240136077,
+        "Risco_Drift": 0.0716987456
+      },
+      {
+        "Feature": "vel_C2",
+        "PSI": 0.0117369035,
+        "Risco_Drift": 0.056805391
+      },
+      {
+        "Feature": "delta_D10",
+        "PSI": 0.025404603,
+        "Risco_Drift": 0.04952846
+      },
+      {
+        "Feature": "ProductCD",
+        "PSI": 0.0202529373,
+        "Risco_Drift": 0.0351928537
+      },
+      {
+        "Feature": "V258",
+        "PSI": 0.0127295116,
+        "Risco_Drift": 0.0314848843
+      },
+      {
+        "Feature": "TransactionAmt",
+        "PSI": 0.0039757776,
+        "Risco_Drift": 0.0286991297
+      }
+    ]
+  },
+  "shap": {
+    "spearman_in_time_vs_oot": 0.9337041157,
+    "top15_oot": [
+      {
+        "Feature": "V70",
+        "SHAP_medio_abs": 0.3240321347
+      },
+      {
+        "Feature": "TransactionAmt",
+        "SHAP_medio_abs": 0.2661843497
+      },
+      {
+        "Feature": "delta_D2",
+        "SHAP_medio_abs": 0.2339401536
+      },
+      {
+        "Feature": "card1_freq",
+        "SHAP_medio_abs": 0.218212628
+      },
+      {
+        "Feature": "delta_D15",
+        "SHAP_medio_abs": 0.2004822417
+      },
+      {
+        "Feature": "vel_C5",
+        "SHAP_medio_abs": 0.1916353974
+      },
+      {
+        "Feature": "vel_C2",
+        "SHAP_medio_abs": 0.1784727389
+      },
+      {
+        "Feature": "P_emaildomain_freq",
+        "SHAP_medio_abs": 0.1697892424
+      },
+      {
+        "Feature": "card2_freq",
+        "SHAP_medio_abs": 0.1527265801
+      },
+      {
+        "Feature": "cartao_tipo_cat",
+        "SHAP_medio_abs": 0.149620864
+      },
+      {
+        "Feature": "delta_D5",
+        "SHAP_medio_abs": 0.1426289531
+      },
+      {
+        "Feature": "V317",
+        "SHAP_medio_abs": 0.1169276241
+      },
+      {
+        "Feature": "delta_D1",
+        "SHAP_medio_abs": 0.1101006834
+      },
+      {
+        "Feature": "card5",
+        "SHAP_medio_abs": 0.1051318842
+      },
+      {
+        "Feature": "match_M6_bin",
+        "SHAP_medio_abs": 0.0974353302
+      }
+    ]
+  },
+  "estabilidade_temporal": {
+    "gini_medio": {
+      "In-Time": 0.7874874968,
+      "OOT": 0.7473720068
+    },
+    "piso_gini": 0.7087387471,
+    "semanas_oot_abaixo_piso": [],
+    "tendencia_gini_oot_semana": 0.004201762,
+    "serie_semanal": [
+      {
+        "semana": 0,
+        "Particao": "Treino (OOF)",
+        "Taxa_Fraude_%": 2.9134657197,
+        "GINI": 0.7779184103,
+        "Recall_%": 73.8805970149
+      },
+      {
+        "semana": 1,
+        "Particao": "Treino (OOF)",
+        "Taxa_Fraude_%": 2.5190598321,
+        "GINI": 0.7428141979,
+        "Recall_%": 76.290097629
+      },
+      {
+        "semana": 2,
+        "Particao": "Treino (OOF)",
+        "Taxa_Fraude_%": 2.4341054872,
+        "GINI": 0.7744694177,
+        "Recall_%": 78.7111622555
+      },
+      {
+        "semana": 3,
+        "Particao": "Treino (OOF)",
+        "Taxa_Fraude_%": 2.0741419813,
+        "GINI": 0.685444845,
+        "Recall_%": 77.3480662983
+      },
+      {
+        "semana": 4,
+        "Particao": "Treino (OOF)",
+        "Taxa_Fraude_%": 3.6228045153,
+        "GINI": 0.8384540199,
+        "Recall_%": 78.9651293588
+      },
+      {
+        "semana": 5,
+        "Particao": "Treino (OOF)",
+        "Taxa_Fraude_%": 3.8386156126,
+        "GINI": 0.8005718142,
+        "Recall_%": 73.2254047323
+      },
+      {
+        "semana": 6,
+        "Particao": "Treino (OOF)",
+        "Taxa_Fraude_%": 4.0021396615,
+        "GINI": 0.7705328968,
+        "Recall_%": 69.0157958688
+      },
+      {
+        "semana": 7,
+        "Particao": "Treino (OOF)",
+        "Taxa_Fraude_%": 4.3621274227,
+        "GINI": 0.8091223477,
+        "Recall_%": 75.0580046404
+      },
+      {
+        "semana": 8,
+        "Particao": "Treino (OOF)",
+        "Taxa_Fraude_%": 4.3253079507,
+        "GINI": 0.8381852822,
+        "Recall_%": 78.8565264293
+      },
+      {
+        "semana": 9,
+        "Particao": "Treino (OOF)",
+        "Taxa_Fraude_%": 4.4199875743,
+        "GINI": 0.8505576769,
+        "Recall_%": 79.8192771084
+      },
+      {
+        "semana": 10,
+        "Particao": "Treino (OOF)",
+        "Taxa_Fraude_%": 4.1998759128,
+        "GINI": 0.8226271835,
+        "Recall_%": 77.5
+      },
+      {
+        "semana": 11,
+        "Particao": "Treino (OOF)",
+        "Taxa_Fraude_%": 3.3506815366,
+        "GINI": 0.8152319904,
+        "Recall_%": 74.4082840237
+      },
+      {
+        "semana": 12,
+        "Particao": "Treino (OOF)",
+        "Taxa_Fraude_%": 4.0730650708,
+        "GINI": 0.7645539442,
+        "Recall_%": 71.8201754386
+      },
+      {
+        "semana": 13,
+        "Particao": "Treino (OOF)",
+        "Taxa_Fraude_%": 3.2228663094,
+        "GINI": 0.752946546,
+        "Recall_%": 68.0995475113
+      },
+      {
+        "semana": 14,
+        "Particao": "Validação",
+        "Taxa_Fraude_%": 3.3758051624,
+        "GINI": 0.7879850237,
+        "Recall_%": 74.5125348189
+      },
+      {
+        "semana": 15,
+        "Particao": "Validação",
+        "Taxa_Fraude_%": 4.1453257384,
+        "GINI": 0.83278229,
+        "Recall_%": 77.7136258661
+      },
+      {
+        "semana": 16,
+        "Particao": "Validação",
+        "Taxa_Fraude_%": 5.0716386754,
+        "GINI": 0.8175836309,
+        "Recall_%": 80.1683816651
+      },
+      {
+        "semana": 17,
+        "Particao": "Validação",
+        "Taxa_Fraude_%": 3.5334040297,
+        "GINI": 0.8365206957,
+        "Recall_%": 76.9507803121
+      },
+      {
+        "semana": 18,
+        "Particao": "Validação",
+        "Taxa_Fraude_%": 3.7750545228,
+        "GINI": 0.7700951979,
+        "Recall_%": 68.0880330124
+      },
+      {
+        "semana": 19,
+        "Particao": "Validação",
+        "Taxa_Fraude_%": 3.2898987723,
+        "GINI": 0.7446228968,
+        "Recall_%": 65.1391162029
+      },
+      {
+        "semana": 20,
+        "Particao": "OOT",
+        "Taxa_Fraude_%": 3.4449296458,
+        "GINI": 0.7295371834,
+        "Recall_%": 61.5023474178
+      },
+      {
+        "semana": 21,
+        "Particao": "OOT",
+        "Taxa_Fraude_%": 3.0779275288,
+        "GINI": 0.7604143975,
+        "Recall_%": 68.1818181818
+      },
+      {
+        "semana": 22,
+        "Particao": "OOT",
+        "Taxa_Fraude_%": 2.8519509363,
+        "GINI": 0.7291402696,
+        "Recall_%": 66.7256637168
+      },
+      {
+        "semana": 23,
+        "Particao": "OOT",
+        "Taxa_Fraude_%": 3.465158285,
+        "GINI": 0.762533467,
+        "Recall_%": 71.7421124829
+      },
+      {
+        "semana": 24,
+        "Particao": "OOT",
+        "Taxa_Fraude_%": 3.675843739,
+        "GINI": 0.7331080217,
+        "Recall_%": 69.031377899
+      },
+      {
+        "semana": 25,
+        "Particao": "OOT",
+        "Taxa_Fraude_%": 4.207976566,
+        "GINI": 0.7686547031,
+        "Recall_%": 69.8795180723
+      }
+    ]
+  },
+  "grupos": {
+    "por_grupo": [
+      {
+        "Grupo": "1. Cartão Clonado",
+        "Janela": "In-Time",
+        "Fraudes": 7429,
+        "Recall_%": 60.4926638848,
+        "Prejuizo_Total_USD": 1648702.2247204487,
+        "Prejuizo_Evitado_USD": 1185771.5070288712,
+        "Prejuizo_Vazado_USD": 462930.7176915775,
+        "%_Vazado_USD": 28.0784917222,
+        "Ticket_Medio_USD": 221.9278805654,
+        "Score_Mediano": 0.5447564156,
+        "%_do_Vazamento_da_Janela": 84.7533603724
+      },
+      {
+        "Grupo": "1. Cartão Clonado",
+        "Janela": "OOT",
+        "Fraudes": 1844,
+        "Recall_%": 46.7462039046,
+        "Prejuizo_Total_USD": 428722.0088181679,
+        "Prejuizo_Evitado_USD": 283132.8370579147,
+        "Prejuizo_Vazado_USD": 145589.1717602532,
+        "%_Vazado_USD": 33.9588751605,
+        "Ticket_Medio_USD": 232.4956663873,
+        "Score_Mediano": 0.4165784259,
+        "%_do_Vazamento_da_Janela": 86.3201387216
+      },
+      {
+        "Grupo": "2. Botnet",
+        "Janela": "In-Time",
+        "Fraudes": 6488,
+        "Recall_%": 89.349568434,
+        "Prejuizo_Total_USD": 347679.2266898842,
+        "Prejuizo_Evitado_USD": 316138.6241287224,
+        "Prejuizo_Vazado_USD": 31540.6025611618,
+        "%_Vazado_USD": 9.0717535417,
+        "Ticket_Medio_USD": 53.5880435712,
+        "Score_Mediano": 0.9396401686,
+        "%_do_Vazamento_da_Janela": 5.7744538288
+      },
+      {
+        "Grupo": "2. Botnet",
+        "Janela": "OOT",
+        "Fraudes": 1733,
+        "Recall_%": 87.7091748413,
+        "Prejuizo_Total_USD": 94182.2915735946,
+        "Prejuizo_Evitado_USD": 85368.9285807604,
+        "Prejuizo_Vazado_USD": 8813.3629928342,
+        "%_Vazado_USD": 9.357770814,
+        "Ticket_Medio_USD": 54.3463886749,
+        "Score_Mediano": 0.919532964,
+        "%_do_Vazamento_da_Janela": 5.2254622164
+      },
+      {
+        "Grupo": "3. Roubo de Contas (ATO)",
+        "Janela": "In-Time",
+        "Fraudes": 2051,
+        "Recall_%": 80.9361287177,
+        "Prejuizo_Total_USD": 382424.4728187505,
+        "Prejuizo_Evitado_USD": 341925.8358354573,
+        "Prejuizo_Vazado_USD": 40498.6369832932,
+        "%_Vazado_USD": 10.5899700102,
+        "Ticket_Medio_USD": 186.4575684148,
+        "Score_Mediano": 0.8815902954,
+        "%_do_Vazamento_da_Janela": 7.4144908593
+      },
+      {
+        "Grupo": "3. Roubo de Contas (ATO)",
+        "Janela": "OOT",
+        "Fraudes": 384,
+        "Recall_%": 77.34375,
+        "Prejuizo_Total_USD": 72066.8900806297,
+        "Prejuizo_Evitado_USD": 61203.3946644386,
+        "Prejuizo_Vazado_USD": 10863.4954161911,
+        "%_Vazado_USD": 15.0741837258,
+        "Ticket_Medio_USD": 187.6741929183,
+        "Score_Mediano": 0.7830800034,
+        "%_do_Vazamento_da_Janela": 6.4409902192
+      },
+      {
+        "Grupo": "4. Ataque Inteligente",
+        "Janela": "In-Time",
+        "Fraudes": 631,
+        "Recall_%": 81.616481775,
+        "Prejuizo_Total_USD": 95104.6789283379,
+        "Prejuizo_Evitado_USD": 83865.3582577185,
+        "Prejuizo_Vazado_USD": 11239.3206706194,
+        "%_Vazado_USD": 11.8178419792,
+        "Ticket_Medio_USD": 150.7205688246,
+        "Score_Mediano": 0.9131732627,
+        "%_do_Vazamento_da_Janela": 2.0576949395
+      },
+      {
+        "Grupo": "4. Ataque Inteligente",
+        "Janela": "OOT",
+        "Fraudes": 103,
+        "Recall_%": 80.5825242718,
+        "Prejuizo_Total_USD": 14963.1700389326,
+        "Prejuizo_Evitado_USD": 11567.3167630566,
+        "Prejuizo_Vazado_USD": 3395.8532758759,
+        "%_Vazado_USD": 22.694744944,
+        "Ticket_Medio_USD": 145.2734955236,
+        "Score_Mediano": 0.8331742647,
+        "%_do_Vazamento_da_Janela": 2.0134088429
+      }
+    ],
+    "pior_grupo_oot": "1. Cartão Clonado",
+    "pior_grupo_oot_vazamento_usd": 145589.1717602532
+  }
+}
